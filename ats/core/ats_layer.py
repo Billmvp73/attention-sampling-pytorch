@@ -134,3 +134,58 @@ class ATSModel(nn.Module):
         y = self.classifier(sample_features)
 
         return y, attention_map, patches, x_low
+
+
+class MultiATSModel(nn.Module):
+    """ Attention sampling model that perform the entire process of calculating the
+        attention map, sampling the patches, calculating the features of the patches,
+        the expectation and classifices the features.
+        Arguments
+        ---------
+        attention_model: pytorch model, that calculated the attention map given a low
+                         resolution input image
+        feature_model: pytorch model, that takes the patches and calculated features
+                       of the patches
+        classifier: pytorch model, that can do a classification into the number of
+                    classes for the specific problem
+        n_patches: int, the number of patches to sample
+        patch_size: int, the patch size (squared)
+        receptive_field: int, how large is the receptive field of the attention network.
+                         It is used to map the attention to high resolution patches.
+        replace: bool, if to sample with our without replacment
+        use_logts: bool, if to use logits when sampling
+    """
+
+    def __init__(self, attention_model, feature_model, classifier, n_patches, patch_size, receptive_field=0,
+                 replace=False, use_logits=False):
+        super(MultiATSModel, self).__init__()
+
+        self.attention_model = attention_model
+        self.feature_model = feature_model
+        self.classifier = classifier
+
+        self.sampler = SamplePatches(n_patches, patch_size, receptive_field, replace, use_logits)
+        self.expectation = Expectation(replace=replace)
+
+        self.patch_size = patch_size
+        self.n_patches = n_patches
+
+    def forward(self, x_low, x_high):
+        # First we compute our attention map
+        attention_map = self.attention_model(x_low)
+
+        # Then we sample patches based on the attention
+        patches, sampled_attention = self.sampler(x_low, x_high, attention_map)
+
+        # We compute the features of the sampled patches
+        channels = patches.shape[2]
+        patches_flat = patches.view(-1, channels, self.patch_size, self.patch_size)
+        patch_features = self.feature_model(patches_flat)
+        dims = patch_features.shape[-1]
+        patch_features = patch_features.view(-1, self.n_patches, dims)
+
+        sample_features = self.expectation(patch_features, sampled_attention)
+
+        y = self.classifier(sample_features)
+
+        return y, attention_map, patches, x_low

@@ -1,0 +1,9 @@
+dataset/*
+!dataset/*.py
+ats/core/__pycache__
+ats/data/__pycache__
+ats/utils/__pycache__
+models/__pycache__
+__pycache__
+.vs
+.vscode

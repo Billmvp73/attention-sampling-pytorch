@@ -12,10 +12,13 @@ import torch.nn.functional as F
 from torch.utils.data import Dataset, DataLoader
 from torchvision import transforms
 import numpy as np
+import ssl
+import certifi
 
 
 def check_file(filepath, md5sum):
     """Check a file against an md5 hash value.
+
     Returns
     -------
         True if the file exists and has the given md5 sum False otherwise
@@ -30,8 +33,32 @@ def check_file(filepath, md5sum):
         return False
 
 
+def download_file(url, destination, progress_file=sys.stderr):
+    """Download a file with progress."""
+    response = urllib.request.urlopen(url)
+    n_bytes = response.headers.get("Content-Length")
+    if n_bytes == "":
+        n_bytes = 0
+    else:
+        n_bytes = int(n_bytes)
+
+    message = "\rReceived {} / {}"
+    cnt = 0
+    with open(destination, "wb") as dst:
+        while True:
+            print(message.format(cnt, n_bytes), file=progress_file,
+                  end="", flush=True)
+            data = response.read(65535)
+            if len(data) == 0:
+                break
+            dst.write(data)
+            cnt += len(data)
+    print(file=progress_file)
+
+
 def ensure_dataset_exists(directory, tries=1, progress_file=sys.stderr):
     """Ensure that the dataset is downloaded and is correct.
+
     Correctness is checked only against the annotations files.
     """
     set1_url = ("http://www.isy.liu.se/cvl/research/trafficSigns"
@@ -46,13 +73,13 @@ def ensure_dataset_exists(directory, tries=1, progress_file=sys.stderr):
     set2_annotations_md5 = "09debbc67f6cd89c1e2a2688ad1d03ca"
 
     integrity = (
-            check_file(
-                path.join(directory, "Set1", "annotations.txt"),
-                set1_annotations_md5
-            ) and check_file(
-        path.join(directory, "Set2", "annotations.txt"),
-        set2_annotations_md5
-    )
+        check_file(
+            path.join(directory, "Set1", "annotations.txt"),
+            set1_annotations_md5
+        ) and check_file(
+            path.join(directory, "Set2", "annotations.txt"),
+            set2_annotations_md5
+        )
     )
 
     if integrity:
@@ -89,32 +116,9 @@ def ensure_dataset_exists(directory, tries=1, progress_file=sys.stderr):
 
     return ensure_dataset_exists(
         directory,
-        tries=tries - 1,
+        tries=tries-1,
         progress_file=progress_file
     )
-
-
-def download_file(url, destination, progress_file=sys.stderr):
-    """Download a file with progress."""
-    response = urllib.request.urlopen(url)
-    n_bytes = response.headers.get("Content-Length")
-    if n_bytes == "":
-        n_bytes = 0
-    else:
-        n_bytes = int(n_bytes)
-
-    message = "\rReceived {} / {}"
-    cnt = 0
-    with open(destination, "wb") as dst:
-        while True:
-            print(message.format(cnt, n_bytes), file=progress_file,
-                  end="", flush=True)
-            data = response.read(65535)
-            if len(data) == 0:
-                break
-            dst.write(data)
-            cnt += len(data)
-    print(file=progress_file)
 
 
 class Sign(namedtuple("Sign", ["visibility", "bbox", "type", "name"])):
@@ -178,7 +182,7 @@ class STS:
     def __init__(self, directory, train=True, seed=0):
         cwd = os.getcwd().replace('dataset', '')
         directory = path.join(cwd, directory)
-        ensure_dataset_exists(directory)
+        # ensure_dataset_exists(directory)
 
         self._directory = directory
         self._inner = "Set{}".format(1 + ((seed + 1 + int(train)) % 2))
@@ -361,7 +365,7 @@ def reverse_transform(inp):
 
 
 if __name__ == '__main__':
-    speedlimit_dataset = SpeedLimits('traffic_data')
+    speedlimit_dataset = SpeedLimits('dataset/traffic_data')
 
     speedlimit_dataloader = DataLoader(speedlimit_dataset, shuffle=True, batch_size=4)
 

@@ -147,3 +147,36 @@ class FeatureModelColonCancer(nn.Module):
 
         out = F.normalize(out, p=2, dim=-1)
         return out
+
+class FeatureModelBddDetection(nn.Module):
+
+    def __init__(self, in_channels, strides=[1, 2, 2, 2], filters=[32, 32, 32, 32]):
+        super(FeatureModelBddDetection, self).__init__()
+
+        stride_prev = strides.pop(0)
+        filters_prev = filters.pop(0)
+
+        self.conv1 = conv_layer(in_channels, filters_prev, 3, stride_prev)
+
+        module_list = nn.ModuleList()
+        for s, f in zip(strides, filters):
+            module_list.append(Block(filters_prev, f, s, 3, s != 1 or f != filters_prev))
+
+            stride_prev = s
+            filters_prev = f
+
+        self.module_list = nn.Sequential(*module_list)
+
+        self.bn1 = batch_norm(filters_prev)
+        self.relu1 = relu()
+        self.pool = nn.AvgPool2d(kernel_size=(13, 13))
+
+    def forward(self, x):
+        out = self.conv1(x)
+        out = self.module_list(out)
+        out = self.bn1(out)
+        out = self.relu1(out)
+        out = self.pool(out)
+        out = out.view(out.shape[0], out.shape[1])
+        out = F.normalize(out, p=2, dim=-1)
+        return out
