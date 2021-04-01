@@ -142,8 +142,16 @@ class AttentionSaverBddDetection:
 
         idxs = training_set.strided(9)
         data = [training_set[i] for i in idxs]
-        self.x_low = torch.stack([d[0] for d in data]).cpu()
-        self.x_high = torch.stack([d[1] for d in data]).cpu()
+
+        x_low_array = [[] for i in range(len(opts.scales))]
+        x_high_array = [[] for i in range(len(opts.scales))]
+        for x_lows, x_highs, label in data:
+            for i in range(len(opts.scales)):
+                x_low_array[i].append(x_lows[i])
+                x_high_array[i].append(x_highs[i])
+        # self.x_low = [torch.stack([dd[i] for dd in d[0] for d in data]).cpu() for i in range(len(opts.scales))]
+        self.x_lows = [torch.stack(x_low).cpu() for x_low in x_low_array]
+        self.x_highs = [torch.stack(x_high).cpu() for x_high in x_high_array]
         self.labels = torch.LongTensor([d[2] for d in data]).numpy()
 
         self.writer = SummaryWriter(os.path.join(self.dir, opts.run_name), flush_secs=5)
@@ -152,25 +160,35 @@ class AttentionSaverBddDetection:
     def on_train_begin(self):
         opts = self.opts
         with torch.no_grad():
-            _, _, _, x_low = self.ats_model(self.x_low.to(opts.device), self.x_high.to(opts.device))
-            x_low = x_low.cpu()
-            image_list = [x for x in x_low]
+            lows = []
+            highs = []
+            for x_low, x_high in zip(self.x_lows, self.x_highs):
+                lows.append(x_low.to(opts.device))
+                highs.append(x_high.to(opts.device))
+            _, _, _, x_lows = self.ats_model(lows, highs)
+            x_lows = [x_low.cpu() for x_low in x_lows]
+            image_lists = [[x for x in x_low] for x_low in x_lows]
+        for scale, image_list in zip(self.opts.scales, image_lists):
+            grid = torchvision.utils.make_grid(image_list, nrow=3, normalize=True, scale_each=True)
 
-        grid = torchvision.utils.make_grid(image_list, nrow=3, normalize=True, scale_each=True)
-
-        self.writer.add_image('original_images', grid, global_step=0, dataformats='CHW')
+            self.writer.add_image('original_images'+str(scale), grid, global_step=0, dataformats='CHW')
         self.__call__(-1)
 
     def __call__(self, epoch, losses=None, metrics=None):
         opts = self.opts
         with torch.no_grad():
-            _, att, _, x_low = self.ats_model(self.x_low.to(opts.device), self.x_high.to(opts.device))
-            att = att.unsqueeze(1)
-            att = F.interpolate(att, size=(x_low.shape[-2], x_low.shape[-1]))
-            att = att.cpu()
-
-        grid = torchvision.utils.make_grid(att, nrow=3, normalize=True, scale_each=True, pad_value=1.)
-        self.writer.add_image('attention_map', grid, epoch, dataformats='CHW')
+            lows = []
+            highs = []
+            for x_low, x_high in zip(self.x_lows, self.x_highs):
+                lows.append(x_low.to(opts.device))
+                highs.append(x_high.to(opts.device))
+            _, atts, _, x_lows = self.ats_model(lows, highs)
+            atts = [att.unsqueeze(1) for att in atts]
+            atts = [F.interpolate(att, size=(x_low.shape[-2], x_low.shape[-1])).cpu() for att, x_low in zip(atts, x_lows)]
+            # att = att.cpu()
+        for scale, att in zip(self.opts.scales, atts):
+            grid = torchvision.utils.make_grid(att, nrow=3, normalize=True, scale_each=True, pad_value=1.)
+            self.writer.add_image('attention_map'+str(scale), grid, epoch, dataformats='CHW')
 
         if metrics is not None:
             train_metrics, test_metrics = metrics

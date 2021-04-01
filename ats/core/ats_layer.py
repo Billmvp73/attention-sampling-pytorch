@@ -180,7 +180,7 @@ class MultiSamplePatches(nn.Module):
 
         return [patches_shape, att_shape]
 
-    def forward(self, x_lows, x_highs, attention, map_index):
+    def forward(self, x_lows, x_highs, attentions):
         sample_space = attention.shape[1:]
         samples, sampled_attention, samples_index = multisample(
             self._n_patches,
@@ -272,29 +272,21 @@ class MultiATSModel(nn.Module):
 
             # First we compute our attention map
             attention_map = self.attention_model(x_low)
-            
-            if scale == 1:
-                high_ats_shape = attention_map.shape
-                upsampled_map = attention_map
-            # Option1: upsample downsampled attention map
-            else:
-                attention_map = torch.unsqueeze(attention_map, dim=1)
-                upsampled_map = F.interpolate(attention_map, size=(high_ats_shape[-2], high_ats_shape[-1]), mode="nearest")
-                upsampled_map = torch.squeeze(upsampled_map)
-                # TBD: do we need to normalize the upsampled attention map?
-                # total_weights = torch.sum(upsampled_map.view(upsampled_map.shape[0], -1), dim=1)
-                # upsampled_map = torch.matmul(upsampled_map.view(upsampled_map.shape[0], -1), 1 / total_weights)
-            attention_maps.append(upsampled_map)
-            
-        multi_ats_map = torch.stack(attention_maps)
-        max_map, max_index = torch.max(multi_ats_map, dim=0)
-        # somehow combine attion maps of multiresolution images     into one map
-        sum_map = torch.sum(max_map.view(max_map.shape[0], -1), dim=1).view(-1, 1)
-        norm_map = max_map.view(max_map.shape[0], -1) / sum_map
-        norm_map = norm_map.view(norm_map.shape[0], high_ats_shape[1], high_ats_shape[2])
-        # Then we sample patches based on the combined attention
-        patches, sampled_attention = self.sampler(x_lows[0], x_highs[0], attention_maps[0])
-        # patches, sampled_attention = self.multiSampler(x_lows, x_highs, norm_map, max_index)
+            attention_maps.append(attention_map)
+            # if scale == 1:
+            #     high_ats_shape = attention_map.shape
+            #     upsampled_map = attention_map
+            # # Option1: upsample downsampled attention map
+            # else:
+            #     attention_map = torch.unsqueeze(attention_map, dim=1)
+            #     upsampled_map = F.interpolate(attention_map, size=(high_ats_shape[-2], high_ats_shape[-1]), mode="nearest")
+            #     upsampled_map = torch.squeeze(upsampled_map)
+            #     # TBD: do we need to normalize the upsampled attention map?
+            #     # total_weights = torch.sum(upsampled_map.view(upsampled_map.shape[0], -1), dim=1)
+            #     # upsampled_map = torch.matmul(upsampled_map.view(upsampled_map.shape[0], -1), 1 / total_weights)
+            # attention_maps.append(upsampled_map)
+
+        patches, sampled_attention = self.multiSampler(x_lows, x_highs, attention_maps)
 
 
         # We compute the features of the sampled patches
@@ -351,7 +343,7 @@ class MultiParallelATSModel(nn.Module):
 
     def forward(self, x_lows, x_highs):
         high_ats_shape = None
-        # attention_maps = []
+        attention_maps = []
         multi_patches = []
         multi_sampled_attention = []
         for i, (x_low, x_high, scale) in enumerate(zip(x_lows, x_highs,self.scales)):
@@ -363,6 +355,7 @@ class MultiParallelATSModel(nn.Module):
             # patches, sampled_attention = self.multiSampler(x_lows, x_highs, norm_map, max_index)
             multi_patches.append(patches)
             multi_sampled_attention.append(sampled_attention)
+            attention_maps.append(attention_map)
         patches = torch.cat(multi_patches, 1)
         sampled_attention = torch.cat(multi_sampled_attention, 1)
         # We compute the features of the sampled patches
@@ -372,8 +365,8 @@ class MultiParallelATSModel(nn.Module):
         dims = patch_features.shape[-1]
         patch_features = patch_features.view(-1, self.n_patches * len(self.scales), dims)
 
-        sample_features = self.expectation(patch_features, sampled_attention)
+        sample_features = self.expectation(patch_features, sampled_attention / len(self.scales))
 
         y = self.classifier(sample_features)
 
-        return y, attention_map, patches, x_low
+        return y, attention_maps, patches, x_lows

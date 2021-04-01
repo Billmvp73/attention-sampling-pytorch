@@ -40,7 +40,7 @@ def main(opts):
                             ], lr=opts.lr)
     scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=opts.decrease_lr_at, gamma=0.1)
 
-    # logger = AttentionSaverBddDetection(opts.output_dir, ats_model, test_dataset, opts)
+    logger = AttentionSaverBddDetection(opts.output_dir, ats_model, test_dataset, opts)
     class_weights = train_dataset.class_frequencies
     class_weights = torch.from_numpy((1. / len(class_weights)) / class_weights).to(opts.device)
 
@@ -55,7 +55,7 @@ def main(opts):
             test_loss, test_metrics = evaluateMultiRes(ats_model, test_loader, criterion,
                                                entropy_loss_func, opts)
 
-        # logger(epoch, (train_loss, test_loss), (train_metrics, test_metrics))
+        logger(epoch, (train_loss, test_loss), (train_metrics, test_metrics))
         scheduler.step()
 
 
@@ -73,9 +73,9 @@ if __name__ == '__main__':
     parser.add_argument("--epochs", type=int, default=500, help="How many epochs to train for")
     parser.add_argument("--decrease_lr_at", type=float, default=250, help="Decrease the learning rate in this epoch")
     parser.add_argument("--clipnorm", type=float, default=1, help="Clip the norm of the gradients")
-    parser.add_argument("--output_dir", type=str, help="An output directory", default='output/traffic')
+    parser.add_argument("--output_dir", type=str, help="An output directory", default='output/bdd_detection')
     parser.add_argument('--run_name', type=str, default='run')
-    parser.add_argument('--num_workers', type=int, default=20, help='Number of workers to use for data loading')
+    parser.add_argument('--num_workers', type=int, default=12, help='Number of workers to use for data loading')
 
     opts = parser.parse_args()
     opts.run_name = f"{opts.run_name}_{time.strftime('%Y%m%dT%H%M%S')}"

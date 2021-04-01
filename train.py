@@ -87,9 +87,9 @@ def trainMultiRes(model, optimizer, train_loader, criterion, entropy_loss_func, 
         x_lows, x_highs, label = move_to([x_lows, x_highs, label], opts.device)
 
         optimizer.zero_grad()
-        y, attention_map, patches, x_low = model(x_lows, x_highs)
+        y, attention_maps, patches, x_lows = model(x_lows, x_highs)
 
-        entropy_loss = entropy_loss_func(attention_map)
+        entropy_loss = torch.tensor([entropy_loss_func(attention_map) for attention_map in attention_maps]).sum() / len(opts.scales)
 
         loss = criterion(y, label) - entropy_loss
         loss.backward()
