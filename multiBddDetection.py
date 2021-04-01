@@ -60,6 +60,8 @@ def main(opts):
 
     start_epoch = 0
     opts.checkpoint_path = os.path.join(opts.output_dir, "checkpoint")
+    if not os.path.exists(opts.checkpoint_path):
+       os.mkdir(opts.checkpoint_path)
     if opts.resume:
         # start_epoch = opts.load_epoch + 1
         ats_model, optimizer, start_epoch = load_checkpoint(ats_model, optimizer, os.path.join(opts.load_dir , "checkpoint{:02d}.pth".format(opts.load_epoch)))
