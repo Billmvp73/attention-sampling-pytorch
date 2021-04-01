@@ -301,7 +301,10 @@ class MultiATSModel(nn.Module):
                 max_xy, max_index = torch.max(merged_xy, dim=0)
                 final_map[:, x, y] = max_xy
                 final_index[:, x, y] = max_index
-
+        # final_map = torch.normalize(final_map, )
+        reshape_map = final_map.view((final_map.shape[0], -1))
+        sum_map = torch.sum(reshape_map, dim=1).view(final_map.shape[0], 1)
+        final_map = (reshape_map / sum_map).view((high_ats_shape[0], high_ats_shape[1], high_ats_shape[2]))
         patches, sampled_attention = self.multiSampler(x_lows, x_highs, final_map, final_index)
 
 
