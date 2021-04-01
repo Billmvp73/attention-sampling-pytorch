@@ -6,7 +6,7 @@ from torch.utils.data import DataLoader
 import argparse
 import time
 
-from models.attention_model import AttentionModelBddDetection
+from models.attention_model import AttentionModelBddDetection, AttentionModelMultiBddDetection
 from models.feature_model import FeatureModelBddDetection
 from models.classifier import ClassificationHead
 
@@ -40,6 +40,7 @@ def main(opts):
         logger = AttentionSaverMultiParallelBddDetection(opts.output_dir, ats_model, test_dataset, opts)
 
     else:
+        attention_model = AttentionModelMultiBddDetection(squeeze_channels=True, softmax_smoothing=1e-4)
         ats_model = MultiATSModel(attention_model, feature_model, classification_head, n_patches=opts.n_patches, patch_size=opts.patch_size, scales=opts.scales)
         ats_model = ats_model.to(opts.device)
 

@@ -5,7 +5,7 @@ import torch.nn.functional as F
 from ..data.from_tensors import FromTensors, FromMultiTensors
 from .sampling import sample, multisample
 from .expectation import Expectation
-
+from ..utils.layers import SampleSoftmax
 
 class SamplePatches(nn.Module):
     """SamplePatches samples from a high resolution image using an attention
@@ -251,6 +251,7 @@ class MultiATSModel(nn.Module):
         super(MultiATSModel, self).__init__()
 
         self.attention_model = attention_model
+        self.sampleSoftmax = SampleSoftmax(True, 1e-4)
         self.feature_model = feature_model
         self.classifier = classifier
 
@@ -272,6 +273,7 @@ class MultiATSModel(nn.Module):
 
             # First we compute our attention map
             attention_map = self.attention_model(x_low)
+            attention_map = attention_map.squeeze(1)
             attention_maps.append(attention_map)
             if scale == 1:
                 high_ats_shape = attention_map.shape
@@ -294,7 +296,9 @@ class MultiATSModel(nn.Module):
                     sx = min(int(x * scale), ats_map.shape[1] - 1)
                     sy = min(int(y * scale), ats_map.shape[2] - 1)
                     if sx != x * scale or sy != y * scale:
-                        weights_xy.append(torch.zeros_like(attention_maps[0][:, 0, 0]))
+                        empty = torch.zeros_like(attention_maps[0][:, 0, 0])
+                        empty[:] = -float('inf')
+                        weights_xy.append(empty)
                     else:
                         weights_xy.append(ats_map[:, sx, sy])
                 merged_xy = torch.stack(weights_xy)
@@ -302,9 +306,10 @@ class MultiATSModel(nn.Module):
                 final_map[:, x, y] = max_xy
                 final_index[:, x, y] = max_index
         # final_map = torch.normalize(final_map, )
-        reshape_map = final_map.view((final_map.shape[0], -1))
-        sum_map = torch.sum(reshape_map, dim=1).view(final_map.shape[0], 1)
-        final_map = (reshape_map / sum_map).view((high_ats_shape[0], high_ats_shape[1], high_ats_shape[2]))
+        # reshape_map = final_map.view((final_map.shape[0], -1))
+        # sum_map = torch.sum(reshape_map, dim=1).view(final_map.shape[0], 1)
+        # final_map = (reshape_map / sum_map).view((high_ats_shape[0], high_ats_shape[1], high_ats_shape[2]))
+        final_map = self.sampleSoftmax(final_map.unsqueeze(1))
         patches, sampled_attention = self.multiSampler(x_lows, x_highs, final_map, final_index)
 
 
