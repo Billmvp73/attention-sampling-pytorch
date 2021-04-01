@@ -180,7 +180,7 @@ class MultiSamplePatches(nn.Module):
 
         return [patches_shape, att_shape]
 
-    def forward(self, x_lows, x_highs, attentions):
+    def forward(self, x_lows, x_highs, attention, map_index):
         sample_space = attention.shape[1:]
         samples, sampled_attention, samples_index = multisample(
             self._n_patches,
@@ -273,8 +273,8 @@ class MultiATSModel(nn.Module):
             # First we compute our attention map
             attention_map = self.attention_model(x_low)
             attention_maps.append(attention_map)
-            # if scale == 1:
-            #     high_ats_shape = attention_map.shape
+            if scale == 1:
+                high_ats_shape = attention_map.shape
             #     upsampled_map = attention_map
             # # Option1: upsample downsampled attention map
             # else:
@@ -285,8 +285,24 @@ class MultiATSModel(nn.Module):
             #     # total_weights = torch.sum(upsampled_map.view(upsampled_map.shape[0], -1), dim=1)
             #     # upsampled_map = torch.matmul(upsampled_map.view(upsampled_map.shape[0], -1), 1 / total_weights)
             # attention_maps.append(upsampled_map)
+        final_map = torch.zeros_like(attention_maps[0])
+        final_index = torch.zeros(high_ats_shape, dtype=torch.int32, device=attention_maps[0].device)
+        for x in range(high_ats_shape[1]):
+            for y in range(high_ats_shape[2]):
+                weights_xy = []
+                for ats_map, scale in zip(attention_maps, self.scales):
+                    sx = min(int(x * scale), ats_map.shape[1] - 1)
+                    sy = min(int(y * scale), ats_map.shape[2] - 1)
+                    if sx != x * scale or sy != y * scale:
+                        weights_xy.append(torch.zeros_like(attention_maps[0][:, 0, 0]))
+                    else:
+                        weights_xy.append(ats_map[:, sx, sy])
+                merged_xy = torch.stack(weights_xy)
+                max_xy, max_index = torch.max(merged_xy, dim=0)
+                final_map[:, x, y] = max_xy
+                final_index[:, x, y] = max_index
 
-        patches, sampled_attention = self.multiSampler(x_lows, x_highs, attention_maps)
+        patches, sampled_attention = self.multiSampler(x_lows, x_highs, final_map, final_index)
 
 
         # We compute the features of the sampled patches
@@ -300,7 +316,7 @@ class MultiATSModel(nn.Module):
 
         y = self.classifier(sample_features)
 
-        return y, attention_map, patches, x_low
+        return y, final_map, patches, x_low
     
 class MultiParallelATSModel(nn.Module):
     """ Attention sampling model that perform the entire process of calculating the

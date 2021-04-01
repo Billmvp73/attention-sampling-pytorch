@@ -89,9 +89,14 @@ def trainMultiRes(model, optimizer, train_loader, criterion, entropy_loss_func, 
         optimizer.zero_grad()
         y, attention_maps, patches, x_lows = model(x_lows, x_highs)
 
-        entropy_loss = torch.tensor([entropy_loss_func(attention_map) for attention_map in attention_maps]).sum() / len(opts.scales)
+        if type(attention_maps) is list:
 
-        loss = criterion(y, label) - entropy_loss
+            entropy_loss = torch.tensor([entropy_loss_func(attention_map) for attention_map in attention_maps]).sum() / len(opts.scales)
+
+            loss = criterion(y, label) - entropy_loss
+        else:
+            entropy_loss = entropy_loss_func(attention_maps)
+            loss = criterion(y, label) - entropy_loss
         loss.backward()
         torch.nn.utils.clip_grad_norm_(model.parameters(), opts.clipnorm)
         optimizer.step()
@@ -124,9 +129,14 @@ def evaluateMultiRes(model, test_loader, criterion, entropy_loss_func, opts):
 
         y, attention_maps, patches, x_lows = model(x_lows, x_highs)
 
-        entropy_loss = torch.tensor([entropy_loss_func(attention_map) for attention_map in attention_maps]).sum() / len(opts.scales)
+        if type(attention_maps) is list:
 
-        loss = criterion(y, label) - entropy_loss
+            entropy_loss = torch.tensor([entropy_loss_func(attention_map) for attention_map in attention_maps]).sum() / len(opts.scales)
+
+            loss = criterion(y, label) - entropy_loss
+        else:
+            entropy_loss = entropy_loss_func(attention_maps)
+            loss = criterion(y, label) - entropy_loss
 
         loss_value = loss.item()
         losses.append(loss_value)
