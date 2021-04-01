@@ -122,9 +122,10 @@ def evaluateMultiRes(model, test_loader, criterion, entropy_loss_func, opts):
 
         x_lows, x_highs, label = move_to([x_lows, x_highs, label], opts.device)
 
-        y, attention_map, patches, x_low = model(x_lows, x_highs)
+        y, attention_maps, patches, x_lows = model(x_lows, x_highs)
 
-        entropy_loss = entropy_loss_func(attention_map)
+        entropy_loss = torch.tensor([entropy_loss_func(attention_map) for attention_map in attention_maps]).sum() / len(opts.scales)
+
         loss = criterion(y, label) - entropy_loss
 
         loss_value = loss.item()
@@ -137,3 +138,19 @@ def evaluateMultiRes(model, test_loader, criterion, entropy_loss_func, opts):
     test_loss_epoch = np.round(np.mean(losses), 4)
     metrics = calc_cls_measures(y_probs, y_trues)
     return test_loss_epoch, metrics
+
+
+def save_checkpoint(model, optimizer, save_path, epoch):
+    torch.save({
+        'model_state_dict': model.state_dict(),
+        'optimizer_state_dict': optimizer.state_dict(),
+        'epoch': epoch
+    }, save_path)
+
+def load_checkpoint(model, optimizer, load_path):
+    checkpoint = torch.load(load_path)
+    model.load_state_dict(checkpoint['model_state_dict'])
+    optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+    epoch = checkpoint['epoch']
+    
+    return model, optimizer, epoch

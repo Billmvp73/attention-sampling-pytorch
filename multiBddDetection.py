@@ -1,3 +1,4 @@
+import os
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -15,7 +16,7 @@ from ats.utils.logging import AttentionSaverBddDetection, AttentionSaverTrafficS
 
 from dataset.bdd_detection_dataset import BddDetection
 from dataset.multiBddDetectionDataset import MultiBddDetection
-from train import train, evaluate, trainMultiRes, evaluateMultiRes
+from train import train, evaluate, trainMultiRes, evaluateMultiRes, save_checkpoint, load_checkpoint
 
 def main(opts):
     train_dataset = MultiBddDetection('dataset/bdd_detection', split="train", scales = [1, 0.5, 0.25])
@@ -47,15 +48,24 @@ def main(opts):
     criterion = nn.CrossEntropyLoss(weight=class_weights)
     entropy_loss_func = MultinomialEntropy(opts.regularizer_strength)
 
-    for epoch in range(opts.epochs):
+    start_epoch = 0
+    if opts.resume:
+        # start_epoch = opts.load_epoch + 1
+        ats_model, optimizer, start_epoch = load_checkpoint(ats_model, optimizer, os.path.join(opts.load_dir , "checkpoint{:02d}.pth".format(opts.load_epoch)))
+        start_epoch += 1
+
+    for epoch in range(start_epoch, opts.epochs):
         train_loss, train_metrics = trainMultiRes(ats_model, optimizer, train_loader,
                                           criterion, entropy_loss_func, opts)
-
+        print("Epoch {}, train loss: {:.3f}, train metrics: {:.3f}".format(epoch, train_loss, train_metrics))
+        if epoch % 2 == 0:
+            save_checkpoint(ats_model, optimizer, os.path.join(opts.checkpoint_path, "checkpoint{:02d}.pth".format(epoch)), epoch)
         with torch.no_grad():
             test_loss, test_metrics = evaluateMultiRes(ats_model, test_loader, criterion,
                                                entropy_loss_func, opts)
 
         logger(epoch, (train_loss, test_loss), (train_metrics, test_metrics))
+        print("Epoch {}, test loss: {:.3f}, test metrics: {:.3f}".format(epoch, test_loss, test_metrics))
         scheduler.step()
 
 
@@ -74,6 +84,10 @@ if __name__ == '__main__':
     parser.add_argument("--decrease_lr_at", type=float, default=250, help="Decrease the learning rate in this epoch")
     parser.add_argument("--clipnorm", type=float, default=1, help="Clip the norm of the gradients")
     parser.add_argument("--output_dir", type=str, help="An output directory", default='output/bdd_detection')
+    parser.add_argument("--checkpoint_path", type=str, help="An output checkpoint directory", default='output/bdd_detection/checkpoint')
+    parser.add_argument("--resume", type=bool, default=False)
+    parser.add_argument("--load_dir", type=str, default="output/bdd_detection/checkpoint")
+    parser.add_argument("--load_epoch", type=int, default=0)
     parser.add_argument('--run_name', type=str, default='run')
     parser.add_argument('--num_workers', type=int, default=12, help='Number of workers to use for data loading')
 
