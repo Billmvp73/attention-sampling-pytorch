@@ -35,13 +35,17 @@ def main(opts):
     logger = None
     if opts.map_parallel:
         ats_model = MultiParallelATSModel(attention_model, feature_model, classification_head, n_patches=opts.n_patches, patch_size=opts.patch_size, scales=opts.scales)
+        ats_model = ats_model.to(opts.device)
+
         logger = AttentionSaverMultiParallelBddDetection(opts.output_dir, ats_model, test_dataset, opts)
 
     else:
         ats_model = MultiATSModel(attention_model, feature_model, classification_head, n_patches=opts.n_patches, patch_size=opts.patch_size, scales=opts.scales)
+        ats_model = ats_model.to(opts.device)
+
         logger = AttentionSaverMultiBddDetection(opts.output_dir, ats_model, test_dataset, opts)
 
-    ats_model = ats_model.to(opts.device)
+    # ats_model = ats_model.to(opts.device)
     optimizer = optim.Adam([{'params': ats_model.attention_model.part1.parameters(), 'weight_decay': 1e-5},
                             {'params': ats_model.attention_model.part2.parameters()},
                             {'params': ats_model.feature_model.parameters()},
