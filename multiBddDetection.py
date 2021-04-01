@@ -9,25 +9,27 @@ from models.attention_model import AttentionModelBddDetection
 from models.feature_model import FeatureModelBddDetection
 from models.classifier import ClassificationHead
 
-from ats.core.ats_layer import ATSModel
+from ats.core.ats_layer import ATSModel, MultiATSModel, MultiParallelATSModel
 from ats.utils.regularizers import MultinomialEntropy
 from ats.utils.logging import AttentionSaverBddDetection, AttentionSaverTrafficSigns
 
 from dataset.bdd_detection_dataset import BddDetection
-from train import train, evaluate
+from dataset.multiBddDetectionDataset import MultiBddDetection
+from train import train, evaluate, trainMultiRes, evaluateMultiRes
 
 def main(opts):
-    train_dataset = BddDetection('dataset/bdd_detection', split="train")
+    train_dataset = MultiBddDetection('dataset/bdd_detection', split="train", scales = [1, 0.5, 0.25])
     train_loader = DataLoader(train_dataset, batch_size=opts.batch_size, shuffle=True, num_workers=opts.num_workers)
 
-    test_dataset = BddDetection('dataset/bdd_detection', split='val')
+    test_dataset = MultiBddDetection('dataset/bdd_detection', split='val', scales = [1, 0.5, 0.25])
     test_loader = DataLoader(test_dataset, shuffle=False, batch_size=opts.batch_size, num_workers=opts.num_workers)
 
     attention_model = AttentionModelBddDetection(squeeze_channels=True, softmax_smoothing=1e-4)
     feature_model = FeatureModelBddDetection(in_channels=3, strides=[1, 2, 2, 2], filters=[32, 32, 32, 32])
     classification_head = ClassificationHead(in_channels=32, num_classes=len(train_dataset.CLASSES))
 
-    ats_model = ATSModel(attention_model, feature_model, classification_head, n_patches=opts.n_patches, patch_size=opts.patch_size)
+    ats_model = MultiParallelATSModel(attention_model, feature_model, classification_head, n_patches=opts.n_patches, patch_size=opts.patch_size, scales=opts.scales)
+    # ats_model = MultiATSModel(attention_model, feature_model, classification_head, n_patches=opts.n_patches, patch_size=opts.patch_size, scales=opts.scales)
     ats_model = ats_model.to(opts.device)
     optimizer = optim.Adam([{'params': ats_model.attention_model.part1.parameters(), 'weight_decay': 1e-5},
                             {'params': ats_model.attention_model.part2.parameters()},
@@ -46,11 +48,11 @@ def main(opts):
     entropy_loss_func = MultinomialEntropy(opts.regularizer_strength)
 
     for epoch in range(opts.epochs):
-        train_loss, train_metrics = train(ats_model, optimizer, train_loader,
+        train_loss, train_metrics = trainMultiRes(ats_model, optimizer, train_loader,
                                           criterion, entropy_loss_func, opts)
 
         with torch.no_grad():
-            test_loss, test_metrics = evaluate(ats_model, test_loader, criterion,
+            test_loss, test_metrics = evaluateMultiRes(ats_model, test_loader, criterion,
                                                entropy_loss_func, opts)
 
         # logger(epoch, (train_loss, test_loss), (train_metrics, test_metrics))
@@ -66,6 +68,7 @@ if __name__ == '__main__':
     parser.add_argument("--lr", type=float, default=0.001, help="Set the optimizer's learning rate")
     parser.add_argument("--n_patches", type=int, default=5, help="How many patches to sample")
     parser.add_argument("--patch_size", type=int, default=100, help="Patch size of a square patch")
+    parser.add_argument("--scales", type=list, default=[1, 0.5, 0.25], help="Multi scales")
     parser.add_argument("--batch_size", type=int, default=32, help="Choose the batch size for SGD")
     parser.add_argument("--epochs", type=int, default=500, help="How many epochs to train for")
     parser.add_argument("--decrease_lr_at", type=float, default=250, help="Decrease the learning rate in this epoch")
