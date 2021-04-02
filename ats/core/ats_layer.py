@@ -212,8 +212,15 @@ class MultiSamplePatches(nn.Module):
         # for i, (x_low, x_high, scale) in enumerate(zip(x_lows, x_highs, self.scales)):
         #     equal_index = torch.where(samples_index==i)
         #     samples_i = samples[equal_index]
-            
-        patches, _ = FromMultiTensors([x_lows, x_highs], None, self.scales).patches(
+        origin_samples = samples
+        # scale_samples = torch.zeros_like(samples)
+        for b in range(samples.shape[0]):
+            for p in range(samples.shape[1]):
+                # samples[b, p] = torch.LongTensor(self.scales[samples_index[b, p]] * samples[b, p])
+                s = self.scales[samples_index[b, p]]
+                samples[b, p, 0] = int(s * samples[b, p, 0])
+                samples[b, p, 1] = int(s * samples[b, p, 1])
+        patches, offsets = FromMultiTensors([x_lows, x_highs], None, self.scales).patches(
             samples,
             samples_index,
             offsets,
@@ -224,7 +231,7 @@ class MultiSamplePatches(nn.Module):
             1
         )
 
-        return [patches, sampled_attention]
+        return [patches, sampled_attention, offsets, samples_index]
 
 class MultiATSModel(nn.Module):
     """ Attention sampling model that perform the entire process of calculating the
@@ -270,47 +277,48 @@ class MultiATSModel(nn.Module):
         high_ats_shape = None
         attention_maps = []
         for i, (x_low, x_high, scale) in enumerate(zip(x_lows, x_highs,self.scales)):
-
             # First we compute our attention map
             attention_map = self.attention_model(x_low)
-            attention_map = attention_map.squeeze(1)
-            attention_maps.append(attention_map)
+            # attention_map = attention_map.squeeze(1)
+            # attention_maps.append(attention_map)
             if scale == 1:
                 high_ats_shape = attention_map.shape
-            #     upsampled_map = attention_map
-            # # Option1: upsample downsampled attention map
-            # else:
-            #     attention_map = torch.unsqueeze(attention_map, dim=1)
-            #     upsampled_map = F.interpolate(attention_map, size=(high_ats_shape[-2], high_ats_shape[-1]), mode="nearest")
-            #     upsampled_map = torch.squeeze(upsampled_map)
-            #     # TBD: do we need to normalize the upsampled attention map?
-            #     # total_weights = torch.sum(upsampled_map.view(upsampled_map.shape[0], -1), dim=1)
-            #     # upsampled_map = torch.matmul(upsampled_map.view(upsampled_map.shape[0], -1), 1 / total_weights)
-            # attention_maps.append(upsampled_map)
-        final_map = torch.zeros_like(attention_maps[0])
-        final_index = torch.zeros(high_ats_shape, dtype=torch.int32, device=attention_maps[0].device)
-        for x in range(high_ats_shape[1]):
-            for y in range(high_ats_shape[2]):
-                weights_xy = []
-                for ats_map, scale in zip(attention_maps, self.scales):
-                    sx = min(int(x * scale), ats_map.shape[1] - 1)
-                    sy = min(int(y * scale), ats_map.shape[2] - 1)
-                    if sx != x * scale or sy != y * scale:
-                        empty = torch.zeros_like(attention_maps[0][:, 0, 0])
-                        empty[:] = -float('inf')
-                        weights_xy.append(empty)
-                    else:
-                        weights_xy.append(ats_map[:, sx, sy])
-                merged_xy = torch.stack(weights_xy)
-                max_xy, max_index = torch.max(merged_xy, dim=0)
-                final_map[:, x, y] = max_xy
-                final_index[:, x, y] = max_index
-        # final_map = torch.normalize(final_map, )
-        # reshape_map = final_map.view((final_map.shape[0], -1))
-        # sum_map = torch.sum(reshape_map, dim=1).view(final_map.shape[0], 1)
-        # final_map = (reshape_map / sum_map).view((high_ats_shape[0], high_ats_shape[1], high_ats_shape[2]))
-        final_map = self.sampleSoftmax(final_map.unsqueeze(1))
-        patches, sampled_attention = self.multiSampler(x_lows, x_highs, final_map, final_index)
+                upsampled_map = attention_map
+            # Option1: upsample downsampled attention map
+            else:
+                # attention_map = torch.unsqueeze(attention_map, dim=1)
+                upsampled_map = F.interpolate(attention_map, size=(high_ats_shape[-2], high_ats_shape[-1]), mode="nearest")
+                upsampled_map = upsampled_map
+                # upsampled_map = torch.squeeze(upsampled_map)
+                # TBD: do we need to normalize the upsampled attention map?
+                # total_weights = torch.sum(upsampled_map.view(upsampled_map.shape[0], -1), dim=1)
+                # upsampled_map = torch.matmul(upsampled_map.view(upsampled_map.shape[0], -1), 1 / total_weights)
+            attention_maps.append(upsampled_map)
+        all_maps = torch.stack(attention_maps)
+        final_map, final_index = torch.max(all_maps, dim = 0)
+        
+
+        # Option 2: Do for-loop to take maximum
+        # final_map = torch.zeros_like(attention_maps[0])
+        # final_index = torch.zeros(high_ats_shape, dtype=torch.int32, device=attention_maps[0].device)
+        # for x in range(high_ats_shape[1]):
+        #     for y in range(high_ats_shape[2]):
+        #         weights_xy = []
+        #         for ats_map, scale in zip(attention_maps, self.scales):
+        #             sx = min(int(x * scale), ats_map.shape[1] - 1)
+        #             sy = min(int(y * scale), ats_map.shape[2] - 1)
+        #             # if sx != x * scale or sy != y * scale:
+        #             #     empty = torch.zeros_like(attention_maps[0][:, 0, 0])
+        #             #     empty[:] = -float('inf')
+        #             #     weights_xy.append(empty)
+        #             # else:
+        #             weights_xy.append(ats_map[:, sx, sy]/4)
+        #         merged_xy = torch.stack(weights_xy)
+        #         max_xy, max_index = torch.max(merged_xy, dim=0)
+        #         final_map[:, x, y] = max_xy
+        #         final_index[:, x, y] = max_index
+        final_map = self.sampleSoftmax(final_map)
+        patches, sampled_attention, offsets, sampled_index = self.multiSampler(x_lows, x_highs, final_map, final_index)
 
 
         # We compute the features of the sampled patches
