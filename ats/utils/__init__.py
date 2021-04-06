@@ -2,7 +2,7 @@
 from functools import partial
 
 import torch
-
+import matplotlib.pyplot as plt
 
 def to_tensor(x, dtype=torch.int32, device=None):
     """If x is a Tensor return it as is otherwise return a constant tensor of
@@ -34,3 +34,20 @@ def expand_many(x, axes):
     for ax in axes:
         x = torch.unsqueeze(x, ax)
     return x
+
+def visualize(patch):
+    np_patch = patch.cpu().numpy().transpose(1, 2, 0)
+    plt.imshow(np_patch)
+    plt.show()
+
+def showPatch(patch, img):
+    np_patch = patch.cpu().numpy().transpose(1, 2, 0)
+    np_img = img.cpu().numpy().transpose(1, 2, 0)
+    fig, axs = plt.subplots(1, 2)
+    axs[0].imshow(np_patch)
+    axs[0].set_title("Patch")
+    axs[1].imshow(np_img)
+    axs[1].set_title("Image")
+    plt.show()
+    # visualize(patch)
+    # visualize(img)

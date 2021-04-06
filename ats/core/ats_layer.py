@@ -254,7 +254,7 @@ class MultiATSModel(nn.Module):
     """
 
     def __init__(self, attention_model, feature_model, classifier, n_patches, patch_size, scales,receptive_field=0,
-                 replace=False, use_logits=False):
+                 replace=False, use_logits=False, area_norm = True):
         super(MultiATSModel, self).__init__()
 
         self.attention_model = attention_model
@@ -273,6 +273,7 @@ class MultiATSModel(nn.Module):
         self.scales = scales
         assert self.scales[0] == 1
 
+        self.area_norm = area_norm
 
     def forward(self, x_lows, x_highs):
         high_ats_shape = None
@@ -289,7 +290,9 @@ class MultiATSModel(nn.Module):
             else:
                 # attention_map = torch.unsqueeze(attention_map, dim=1)
                 upsampled_map = F.interpolate(attention_map, size=(high_ats_shape[-2], high_ats_shape[-1]), mode="nearest")
-                upsampled_map = upsampled_map
+                # upsampled_map = upsampled_map
+                if self.area_norm:
+                    upsampled_map *= scale * scale
                 # upsampled_map = torch.squeeze(upsampled_map)
                 # TBD: do we need to normalize the upsampled attention map?
                 # total_weights = torch.sum(upsampled_map.view(upsampled_map.shape[0], -1), dim=1)

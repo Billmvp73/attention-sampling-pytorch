@@ -2,7 +2,7 @@ import os
 import torch
 from joblib import Parallel, delayed
 
-from ..utils import to_tensor, to_float32, to_int32, expand_many
+from ..utils import to_tensor, to_float32, to_int32, expand_many, showPatch
 
 
 def _extract_patch(img_b, coord, patch_size):
@@ -176,6 +176,10 @@ def _extract_multi_patches_batch(b, imgs, offsets, patch_size, num_patches, samp
         for p in range(num_patches):
             s = samples_index[b, p]
             patch = _extract_multi_patch(imgs[s][b], offsets[b, p], patch_size)
+            # print("Extract patch from image scale %d"%s)
+            # print("offset ", offsets[b, p])
+            # print("img size ", imgs[s][b].shape)
+            # showPatch(patch, imgs[s][b])
             patches.append(patch)
 
     return torch.stack(patches)
@@ -286,7 +290,7 @@ class FromMultiTensors:
         #     expand_many(to_float32(patch_size) / 2, [0, 0])
         # ))
         offsets = to_int32(torch.round(computed_offsets))
-
+        # print("All offsets ", offsets)
         # Extract the patches
         patches = extract_multi_patches(
             self._xs[tolevel],

@@ -43,9 +43,13 @@ def main(opts):
 
     else:
         print("Run unparallel model.")
-        print("Merge before softmax without area normalization.")
         attention_model = AttentionModelMultiBddDetection(squeeze_channels=True, softmax_smoothing=1e-4)
-        ats_model = MultiATSModel(attention_model, feature_model, classification_head, n_patches=opts.n_patches, patch_size=opts.patch_size, scales=opts.scales)
+        if opts.area_norm:
+          print("Merge before softmax with area normalization.")
+          ats_model = MultiATSModel(attention_model, feature_model, classification_head, n_patches=opts.n_patches, patch_size=opts.patch_size, scales=opts.scales, area_norm=True)
+        else:
+          print("Merge before softmax without area normalization.")
+          ats_model = MultiATSModel(attention_model, feature_model, classification_head, n_patches=opts.n_patches, patch_size=opts.patch_size, scales=opts.scales, area_norm=False)
         ats_model = ats_model.to(opts.device)
 
         logger = AttentionSaverMultiBddDetection(opts.output_dir, ats_model, test_dataset, opts)
@@ -111,6 +115,7 @@ if __name__ == '__main__':
     parser.add_argument("--output_dir", type=str, help="An output directory", default='output/bdd_detection')
     # parser.add_argument("--checkpoint_path", type=str, help="An output checkpoint directory", default='output/bdd_detection/checkpoint')
     parser.add_argument("--map_parallel", type=bool, default=False)
+    parser.add_argument("--area_norm", type=bool, default=False)
     parser.add_argument("--resume", type=bool, default=False)
     parser.add_argument("--load_dir", type=str, default="output/bdd_detection/checkpoint")
     parser.add_argument("--load_epoch", type=int, default=0)
