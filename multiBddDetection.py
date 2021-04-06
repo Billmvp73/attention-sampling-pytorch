@@ -34,12 +34,16 @@ def main(opts):
     ats_model = None
     logger = None
     if opts.map_parallel:
+        print("Run parallel model.")
+        print("n patches for high res, and another n for low res.")
         ats_model = MultiParallelATSModel(attention_model, feature_model, classification_head, n_patches=opts.n_patches, patch_size=opts.patch_size, scales=opts.scales)
         ats_model = ats_model.to(opts.device)
 
         logger = AttentionSaverMultiParallelBddDetection(opts.output_dir, ats_model, test_dataset, opts)
 
     else:
+        print("Run unparallel model.")
+        print("Merge before softmax without area normalization.")
         attention_model = AttentionModelMultiBddDetection(squeeze_channels=True, softmax_smoothing=1e-4)
         ats_model = MultiATSModel(attention_model, feature_model, classification_head, n_patches=opts.n_patches, patch_size=opts.patch_size, scales=opts.scales)
         ats_model = ats_model.to(opts.device)
