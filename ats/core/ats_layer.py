@@ -262,8 +262,9 @@ class MultiATSModel(nn.Module):
         self.feature_model = feature_model
         self.classifier = classifier
 
-        self.multiSampler = MultiSamplePatches(n_patches, patch_size, scales, receptive_field, replace, use_logits)
-        self.sampler = SamplePatches(n_patches, patch_size, receptive_field, replace, use_logits)
+        # self.multiSampler = MultiSamplePatches(n_patches, patch_size, scales, receptive_field, replace, use_logits)
+        # self.sampler = SamplePatches(n_patches, patch_size, receptive_field, replace, use_logits)
+        self.sampler = MultiSamplePatches(n_patches, patch_size, scales, receptive_field, replace, use_logits)
         self.expectation = Expectation(replace=replace)
 
         self.patch_size = patch_size
@@ -318,7 +319,8 @@ class MultiATSModel(nn.Module):
         #         final_map[:, x, y] = max_xy
         #         final_index[:, x, y] = max_index
         final_map = self.sampleSoftmax(final_map)
-        patches, sampled_attention, offsets, sampled_index = self.multiSampler(x_lows, x_highs, final_map, final_index)
+        patches, sampled_attention, offsets, sampled_index = self.sampler(x_lows, x_highs, final_map, final_index)
+        # sampled_index = self.multiSampler(x_lows, x_highs, final_map, final_index)
 
 
         # We compute the features of the sampled patches
