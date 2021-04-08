@@ -40,6 +40,11 @@ def visualize(patch):
     plt.imshow(np_patch)
     plt.show()
 
+# def visualizeGrid(patch, axs, i, j):
+#     np_patch = patch.cpu().numpy().transpose(1, 2, 0)
+#     axs[i, j].imshow(np_patch)
+#     axs[i, j].set_title("Patch(%d, %d)"%(i, j))
+
 def showPatch(patch, img):
     np_patch = patch.cpu().numpy().transpose(1, 2, 0)
     np_img = img.cpu().numpy().transpose(1, 2, 0)
@@ -51,3 +56,28 @@ def showPatch(patch, img):
     plt.show()
     # visualize(patch)
     # visualize(img)
+
+def patchGrid(patches, size):
+    row, col = size
+    figs, axs = plt.subplots(row, col)
+    for i in range(patches.shape[0]):
+        r = i // col
+        c = i % col
+        np_patch = patches[i].cpu().numpy().transpose(1, 2, 0)
+        axs[r, c].imshow(np_patch)
+        axs[r, c].set_title("Patch(%d)"%(i))
+        axs[r, c].axis("off")
+    plt.show()
+    plt.clf()
+    plt.close()
+
+def mapGrid(maps, imgs, scales):
+    figs, axs = plt.subplots(2, len(scales))
+    for i, (map, img, scale) in enumerate(zip(maps, imgs, scales)):
+        axs[0, i].imshow(map.cpu().numpy())
+        axs[1, i].imshow(img.cpu().numpy().transpose(1, 2, 0))
+        axs[0, i].axis("off")
+        axs[1, i].axis("off")
+    plt.show()
+    plt.clf()
+    plt.close()

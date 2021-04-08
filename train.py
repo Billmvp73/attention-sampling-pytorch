@@ -5,7 +5,7 @@ from tqdm import tqdm
 import pdb
 
 from utils import calc_cls_measures, move_to
-
+from ats.utils import visualize, showPatch, patchGrid, mapGrid
 
 def train(model, optimizer, train_loader, criterion, entropy_loss_func, opts):
     """ Train for a single epoch """
@@ -88,9 +88,11 @@ def trainMultiRes(model, optimizer, train_loader, criterion, entropy_loss_func, 
 
         optimizer.zero_grad()
         y, attention_maps, patches, x_lows = model(x_lows, x_highs)
-
+       
         if type(attention_maps) is list:
-
+            # for attention_map in attention_maps:
+            #     print(torch.max(attention_map))
+            #     print(torch.min(attention_map))
             entropy_loss = torch.tensor([entropy_loss_func(attention_map) for attention_map in attention_maps]).sum() / len(opts.scales)
 
             loss = criterion(y, label) - entropy_loss
@@ -129,8 +131,24 @@ def evaluateMultiRes(model, test_loader, criterion, entropy_loss_func, opts):
 
         y, attention_maps, patches, x_lows = model(x_lows, x_highs)
 
-        if type(attention_maps) is list:
+        ## visualize
+        # for i, (scale, x_low) in  enumerate(zip(model.scales, x_lows)):
+        #     if type(attention_maps) is list:
+        #         ats_map = attention_maps[i]
+        #         showPatch()
+        if opts.visualize:
+            for b in range(patches.shape[0]):
+                batch_patches = patches[b]
+                patchGrid(batch_patches, (2, 3))
+                if type(attention_maps) is list:
+                    batch_maps = [attention_maps[i][b] for i in range(len(model.scales))]
+                else:
+                    batch_maps = [attention_maps[b] for i in range(len(model.scales))]
+                batch_imgs = [x_lows[i][b] for i in range(len(model.scales))]
+                mapGrid(batch_maps, batch_imgs, model.scales)
 
+        if type(attention_maps) is list:
+            
             entropy_loss = torch.tensor([entropy_loss_func(attention_map) for attention_map in attention_maps]).sum() / len(opts.scales)
 
             loss = criterion(y, label) - entropy_loss

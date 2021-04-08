@@ -289,7 +289,8 @@ class MultiATSModel(nn.Module):
             # Option1: upsample downsampled attention map
             else:
                 # attention_map = torch.unsqueeze(attention_map, dim=1)
-                upsampled_map = F.interpolate(attention_map, size=(high_ats_shape[-2], high_ats_shape[-1]), mode="nearest")
+                # upsampled_map = F.interpolate(attention_map, size=(high_ats_shape[-2], high_ats_shape[-1]), mode="nearest")
+                upsampled_map = torch.nn.Upsample(size=(high_ats_shape[-2], high_ats_shape[-1]), mode ="nearest")(attention_map)
                 # upsampled_map = upsampled_map
                 if self.area_norm:
                     upsampled_map *= scale * scale
