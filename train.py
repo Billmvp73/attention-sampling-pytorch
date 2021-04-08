@@ -139,8 +139,11 @@ def evaluateMultiRes(model, test_loader, criterion, entropy_loss_func, opts):
         if opts.visualize:
             for b in range(patches.shape[0]):
                 batch_patches = patches[b]
-                patchGrid(batch_patches, (2, 3))
+                patchGrid(batch_patches, (3, 5))
                 if type(attention_maps) is list:
+                    for attention_map in attention_maps:
+                        print(torch.max(attention_map))
+                        print(torch.min(attention_map))
                     batch_maps = [attention_maps[i][b] for i in range(len(model.scales))]
                 else:
                     batch_maps = [attention_maps[b] for i in range(len(model.scales))]

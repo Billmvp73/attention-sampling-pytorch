@@ -403,7 +403,16 @@ class MultiParallelATSModel(nn.Module):
         dims = patch_features.shape[-1]
         patch_features = patch_features.view(-1, self.n_patches * len(self.scales), dims)
 
-        sample_features = self.expectation(patch_features, sampled_attention / len(self.scales))
+
+        weight_scales = torch.ones_like(sampled_attention)
+        for i, scale in enumerate(self.scales):
+            prefix = i * self.n_patches
+            for j in range(self.n_patches):
+                index = prefix + j
+                weight_scales[:, index] *= scale * scale
+        # weight_scales = torch.div(weight_scales, )
+        weight_scales = weight_scales / torch.sum(weight_scales, axis=1)[0]
+        sample_features = self.expectation(patch_features, sampled_attention / len(self.scales), weight_scales)
 
         y = self.classifier(sample_features)
 
