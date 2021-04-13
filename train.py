@@ -273,8 +273,8 @@ def evaluateMultiResBatches(model, test_loader, criterion, entropy_loss_func, op
         # scale-2 low res batch
         for i in range(1, len(opts.scales)):
             s = opts.scales[i]
-            x_low_i = F.interpolate(x_low, scale_factor = s, mode='bilinear')[0]
-            x_high_i = F.interpolate(x_high, scale_factor = s, mode='bilinear')[0]
+            x_low_i = F.interpolate(x_low, scale_factor = s, mode='bilinear')
+            x_high_i = F.interpolate(x_high, scale_factor = s, mode='bilinear')
 
             x_low_i, x_high_i = move_to([x_low_i, x_high_i], opts.device)
 
