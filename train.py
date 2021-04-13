@@ -176,66 +176,57 @@ def trainMultiResBatches(model, optimizer, train_loader, criterion, entropy_loss
     y_probs = np.zeros((0, len(train_loader.dataset.CLASSES)), np.float)
     y_trues = np.zeros((0), np.int)
     losses = [[] for s in opts.scales]
+    
     metrics = []
     # Put model in training mode
     model.train()
 
     for i, (x_low, x_high, label) in enumerate(tqdm(train_loader)):
+        loss_set = []
         # high res batch
         x_low, x_high, label = move_to([x_low, x_high, label], opts.device)
 
         optimizer.zero_grad()
-        y, attention_map, patches, x_low_out = model(x_low, x_high)
 
-        entropy_loss = entropy_loss_func(attention_map)
-
-        loss = criterion(y, label) - entropy_loss
-        loss.backward()
-        torch.nn.utils.clip_grad_norm_(model.parameters(), opts.clipnorm)
-        optimizer.step()
-
-        loss_value = loss.item()
-        losses[0].append(loss_value)
-
-        y_prob = F.softmax(y, dim=1)
-        y_probs = np.concatenate([y_probs, y_prob.detach().cpu().numpy()])
-        y_trues = np.concatenate([y_trues, label.cpu().numpy()])
-
-        metric = calc_cls_measures(y_probs, y_trues)
-        metrics.append(metric)
-
-        # scale-2 low res batch
-        for i in range(1, len(opts.scales)):
+        for i in range(0, len(opts.scales)):
             s = opts.scales[i]
             x_low_i = F.interpolate(x_low, scale_factor = s, mode='bilinear')
             x_high_i = F.interpolate(x_high, scale_factor = s, mode='bilinear')
 
             x_low_i, x_high_i = move_to([x_low_i, x_high_i], opts.device)
 
-            optimizer.zero_grad()
-            y, attention_map, patches, x_low_i_out = model(x_low_i, x_high_i)
+            # optimizer.zero_grad()
+            y_i, attention_map, patches, x_low_i_out = model(x_low_i, x_high_i)
 
             entropy_loss = entropy_loss_func(attention_map)
 
-            loss = criterion(y, label) - entropy_loss
+            loss = criterion(y_i, label) - entropy_loss
+            loss_set.append(loss)
+            # loss_i.backward()
 
-            loss.backward()
+            # torch.nn.utils.clip_grad_norm_(model.parameters(), opts.clipnorm)
 
-            torch.nn.utils.clip_grad_norm_(model.parameters(), opts.clipnorm)
-
-            optimizer.step()
+            # optimizer.step()
 
             loss_value = loss.item()
 
             losses[i].append(loss_value)
 
-            y_prob = F.softmax(y, dim=1)
+            y_prob = F.softmax(y_i, dim=1)
             y_probs = np.concatenate([y_probs, y_prob.detach().cpu().numpy()])
             y_trues = np.concatenate([y_trues, label.cpu().numpy()])
 
             metric = calc_cls_measures(y_probs, y_trues)
             metrics.append(metric)
-
+        loss = None
+        for i in loss_set:
+            if loss is None:
+                loss = i
+            else:
+                loss += i
+        loss.backward()
+        torch.nn.utils.clip_grad_norm_(model.parameters(), opts.clipnorm)
+        optimizer.step()
     train_loss_epoch = [np.round(np.mean(loss_s), 4) for loss_s in losses]
     # metrics = calc_cls_measures(y_probs, y_trues)
     return train_loss_epoch, metrics
