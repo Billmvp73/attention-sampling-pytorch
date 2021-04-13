@@ -107,7 +107,7 @@ def main(opts):
         else:
           scale_avg = [[], []]
           for i, s in enumerate(opts.scales):
-            print("Epoch {}, scale %f train loss: {:.3f}, train metrics: {:.3f}".format(epoch, s, train_loss[i], train_metrics[i]["accuracy"]))
+            print("Epoch {}, scale {}, train loss: {:.3f}, train metrics: {:.3f}".format(epoch, s, train_loss[i], train_metrics[i]["accuracy"]))
             scale_avg[0].append(train_loss[i])
             scale_avg[1].append(train_metrics[i]['accuracy'])
           avg_train_loss = np.round(np.mean(scale_avg[0]), 4)
@@ -122,7 +122,7 @@ def main(opts):
         else:
           scale_avg = [[], []]
           for i, s in enumerate(opts.scales):
-            print("Epoch {}, scale %f test loss: {:.3f}, test metrics: {:.3f}".format(epoch, s, test_loss[i], test_metrics[i]["accuracy"]))
+            print("Epoch {}, scale {} test loss: {:.3f}, test metrics: {:.3f}".format(epoch, s, test_loss[i], test_metrics[i]["accuracy"]))
             scale_avg[0].append(test_loss[i])
             scale_avg[1].append(test_metrics[i]["accuracy"])
           avg_test_loss = np.round(np.mean(scale_avg[0]), 4)
