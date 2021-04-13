@@ -392,7 +392,7 @@ class AttentionSaverMultiBatchBddDetection:
                 self.writer.add_scalar('%f-Loss/Test'%s, test_loss[i], epoch)
             train_loss_avg_scales = np.round(np.mean(train_loss), 4)
             test_loss_avg_scales = np.round(np.mean(test_loss), 4)
-            self.write.add_scalar('multiAvgLoss/Train', train_loss_avg_scales, epoch)
+            self.writer.add_scalar('multiAvgLoss/Train', train_loss_avg_scales, epoch)
             self.writer.add_scalar('multiAvgLoss/Test', test_loss_avg_scales, epoch)
 
     @staticmethod
