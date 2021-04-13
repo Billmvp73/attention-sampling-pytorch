@@ -5,68 +5,58 @@ import torch.optim as optim
 from torch.utils.data import DataLoader
 import argparse
 import time
-import numpy as np
+
 from models.attention_model import AttentionModelBddDetection, AttentionModelMultiBddDetection
 from models.feature_model import FeatureModelBddDetection
 from models.classifier import ClassificationHead
 
 from ats.core.ats_layer import ATSModel, MultiATSModel, MultiParallelATSModel
 from ats.utils.regularizers import MultinomialEntropy
-from ats.utils.logging import AttentionSaverMultiBddDetection, AttentionSaverMultiParallelBddDetection, AttentionSaverMultiBatchBddDetection
+from ats.utils.logging import AttentionSaverMultiBddDetection, AttentionSaverMultiParallelBddDetection
 
 from dataset.bdd_detection_dataset import BddDetection
 from dataset.multiBddDetectionDataset import MultiBddDetection
-from train import trainMultiResBatches, evaluateMultiResBatches, train, evaluate, trainMultiRes, evaluateMultiRes, save_checkpoint, load_checkpoint
+from train import train, evaluate, trainMultiRes, evaluateMultiRes, save_checkpoint, load_checkpoint
 
 def main(opts):
     if not os.path.exists(opts.load_dir):
       os.mkdir(opts.load_dir)
-    if not os.path.exists(opts.output_dir):
-      os.mkdir(opts.output_dir)
-    if not opts.multiResBatch:
-      train_dataset = MultiBddDetection('dataset/bdd_detection', split="train", scales = opts.scales)
-      test_dataset = MultiBddDetection('dataset/bdd_detection', split='val', scales = opts.scales)
-    else:
-      train_dataset = BddDetection('dataset/bdd_detection', split="train")
-      test_dataset = BddDetection('dataset/bdd_detection', split="val")
+    train_dataset = MultiBddDetection('dataset/bdd_detection', split="train", scales = [1, 0.5, 0.25])
     train_loader = DataLoader(train_dataset, batch_size=opts.batch_size, shuffle=True, num_workers=opts.num_workers)
+
+    test_dataset = MultiBddDetection('dataset/bdd_detection', split='val', scales = [1, 0.5, 0.25])
     test_loader = DataLoader(test_dataset, shuffle=False, batch_size=opts.batch_size, num_workers=opts.num_workers)
 
-    if not opts.multiResBatch:
-      attention_model = AttentionModelBddDetection(squeeze_channels=True, softmax_smoothing=1e-4)
-      feature_model = FeatureModelBddDetection(in_channels=3, strides=[1, 2, 2, 2], filters=[32, 32, 32, 32])
-      classification_head = ClassificationHead(in_channels=32, num_classes=len(train_dataset.CLASSES))
-
-      ats_model = None
-      logger = None
-      if opts.map_parallel:
-          print("Run parallel model.")
-          print("n patches for high res, and another n for low res.")
-          ats_model = MultiParallelATSModel(attention_model, feature_model, classification_head, n_patches=opts.n_patches, patch_size=opts.patch_size, scales=opts.scales)
-          ats_model = ats_model.to(opts.device)
-
-          logger = AttentionSaverMultiParallelBddDetection(opts.output_dir, ats_model, test_dataset, opts)
-
-      else:
-          print("Run unparallel model.")
-          attention_model = AttentionModelMultiBddDetection(squeeze_channels=True, softmax_smoothing=1e-4)
-          if opts.area_norm:
-            print("Merge before softmax with area normalization.")
-            ats_model = MultiATSModel(attention_model, feature_model, classification_head, n_patches=opts.n_patches, patch_size=opts.patch_size, scales=opts.scales, area_norm=True)
-          else:
-            print("Merge before softmax without area normalization.")
-            ats_model = MultiATSModel(attention_model, feature_model, classification_head, n_patches=opts.n_patches, patch_size=opts.patch_size, scales=opts.scales, area_norm=False)
-          ats_model = ats_model.to(opts.device)
-
-          logger = AttentionSaverMultiBddDetection(opts.output_dir, ats_model, test_dataset, opts)
-    else:
+    attention_models = []
+    for s in opts.scales:
         attention_model = AttentionModelBddDetection(squeeze_channels=True, softmax_smoothing=1e-4)
-        feature_model = FeatureModelBddDetection(in_channels=3, strides=[1, 2, 2, 2], filters=[32, 32, 32, 32])
-        classification_head = ClassificationHead(in_channels=32, num_classes=len(train_dataset.CLASSES))
+        attention_models.append(attention_model)
+    feature_model = FeatureModelBddDetection(in_channels=3, strides=[1, 2, 2, 2], filters=[32, 32, 32, 32])
+    classification_head = ClassificationHead(in_channels=32, num_classes=len(train_dataset.CLASSES))
 
-        ats_model = ATSModel(attention_model, feature_model, classification_head, n_patches=opts.n_patches, patch_size=opts.patch_size)
+    ats_model = None
+    logger = None
+    if opts.map_parallel:
+        print("Run parallel model.")
+        print("n patches for high res, and another n for low res.")
+        ats_model = MultiParallelATSModel(attention_model, feature_model, classification_head, n_patches=opts.n_patches, patch_size=opts.patch_size, scales=opts.scales)
         ats_model = ats_model.to(opts.device)
-        logger = AttentionSaverMultiBatchBddDetection(opts.output_dir, ats_model, test_dataset, opts)
+
+        logger = AttentionSaverMultiParallelBddDetection(opts.output_dir, ats_model, test_dataset, opts)
+
+    else:
+        print("Run unparallel model.")
+        attention_model = AttentionModelMultiBddDetection(squeeze_channels=True, softmax_smoothing=1e-4)
+        if opts.area_norm:
+          print("Merge before softmax with area normalization.")
+          ats_model = MultiATSModel(attention_model, feature_model, classification_head, n_patches=opts.n_patches, patch_size=opts.patch_size, scales=opts.scales, area_norm=True)
+        else:
+          print("Merge before softmax without area normalization.")
+          ats_model = MultiATSModel(attention_model, feature_model, classification_head, n_patches=opts.n_patches, patch_size=opts.patch_size, scales=opts.scales, area_norm=False)
+        ats_model = ats_model.to(opts.device)
+
+        logger = AttentionSaverMultiBddDetection(opts.output_dir, ats_model, test_dataset, opts)
+
     # ats_model = ats_model.to(opts.device)
     optimizer = optim.Adam([{'params': ats_model.attention_model.part1.parameters(), 'weight_decay': 1e-5},
                             {'params': ats_model.attention_model.part2.parameters()},
@@ -98,36 +88,16 @@ def main(opts):
 
     for epoch in range(start_epoch, opts.epochs):
         print("Start epoch %d"%epoch)
-        train_loss, train_metrics = trainMultiResBatches(ats_model, optimizer, train_loader, criterion, entropy_loss_func, opts)
+        train_loss, train_metrics = trainMultiRes(ats_model, optimizer, train_loader, criterion, entropy_loss_func, opts)
         if epoch % 2 == 0:
           save_checkpoint(ats_model, optimizer, os.path.join(opts.checkpoint_path, "checkpoint{:02d}.pth".format(epoch)), epoch)
           print("Save "+os.path.join(opts.checkpoint_path, "checkpoint{:02d}.pth".format(epoch))+" successfully.")
-        if not opts.multiResBatch:
-          print("Epoch {}, train loss: {:.3f}, train metrics: {:.3f}".format(epoch, train_loss, train_metrics["accuracy"]))
-        else:
-          scale_avg = [[], []]
-          for i, s in enumerate(opts.scales):
-            print("Epoch {}, scale %f train loss: {:.3f}, train metrics: {:.3f}".format(epoch, s, train_loss[i], train_metrics[i]["accuracy"]))
-            scale_avg[0].append(train_loss[i])
-            scale_avg[1].append(train_metrics[i]['accuracy'])
-          avg_train_loss = np.round(np.mean(scale_avg[0]), 4)
-          avg_train_metrics = np.mean(scale_avg[1])
-          print("Epoch {}, avg train loss: {:.3f}, train metrics: {:.3f}".format(epoch, avg_train_loss, avg_train_metrics))
+        print("Epoch {}, train loss: {:.3f}, train metrics: {:.3f}".format(epoch, train_loss, train_metrics["accuracy"]))
         with torch.no_grad():
-            test_loss, test_metrics = evaluateMultiResBatches(ats_model, test_loader, criterion, entropy_loss_func, opts)
+            test_loss, test_metrics = evaluateMultiRes(ats_model, test_loader, criterion, entropy_loss_func, opts)
 
         logger(epoch, (train_loss, test_loss), (train_metrics, test_metrics))
-        if not opts.multiResBatch:
-          print("Epoch {}, test loss: {:.3f}, test metrics: {:.3f}".format(epoch, test_loss, test_metrics["accuracy"]))
-        else:
-          scale_avg = [[], []]
-          for i, s in enumerate(opts.scales):
-            print("Epoch {}, scale %f test loss: {:.3f}, test metrics: {:.3f}".format(epoch, s, test_loss[i], test_metrics[i]["accuracy"]))
-            scale_avg[0].append(test_loss[i])
-            scale_avg[1].append(test_metrics[i]["accuracy"])
-          avg_test_loss = np.round(np.mean(scale_avg[0]), 4)
-          avg_test_metrics = np.mean(scale_avg[1])
-          print("Epoch {}, avg test loss: {:.3f}, test metrics: {:.3f}".format(epoch, avg_test_loss, avg_test_metrics))
+        print("Epoch {}, test loss: {:.3f}, test metrics: {:.3f}".format(epoch, test_loss, test_metrics["accuracy"]))
         scheduler.step()
 
 
@@ -150,7 +120,6 @@ if __name__ == '__main__':
     parser.add_argument("--map_parallel", type=bool, default=False)
     parser.add_argument("--area_norm", type=bool, default=False)
     parser.add_argument("--resume", type=bool, default=False)
-    parser.add_argument("--multiResBatch", type=bool, default=False, help="Flag to train multiresolution in separate batches")
     parser.add_argument("--visualize", type=bool, default=False)
     parser.add_argument("--load_dir", type=str, default="output/bdd_detection/checkpoint")
     parser.add_argument("--load_epoch", type=int, default=0)

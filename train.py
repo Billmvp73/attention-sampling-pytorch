@@ -170,6 +170,134 @@ def evaluateMultiRes(model, test_loader, criterion, entropy_loss_func, opts):
     metrics = calc_cls_measures(y_probs, y_trues)
     return test_loss_epoch, metrics
 
+def trainMultiResBatches(model, optimizer, train_loader, criterion, entropy_loss_func, opts):
+    """ Train for a single epoch """
+
+    y_probs = np.zeros((0, len(train_loader.dataset.CLASSES)), np.float)
+    y_trues = np.zeros((0), np.int)
+    losses = [[] for s in opts.scales]
+    metrics = []
+    # Put model in training mode
+    model.train()
+
+    for i, (x_low, x_high, label) in enumerate(tqdm(train_loader)):
+        # high res batch
+        x_low, x_high, label = move_to([x_low, x_high, label], opts.device)
+
+        optimizer.zero_grad()
+        y, attention_map, patches, x_low_out = model(x_low, x_high)
+
+        entropy_loss = entropy_loss_func(attention_map)
+
+        loss = criterion(y, label) - entropy_loss
+        loss.backward()
+        torch.nn.utils.clip_grad_norm_(model.parameters(), opts.clipnorm)
+        optimizer.step()
+
+        loss_value = loss.item()
+        losses[0].append(loss_value)
+
+        y_prob = F.softmax(y, dim=1)
+        y_probs = np.concatenate([y_probs, y_prob.detach().cpu().numpy()])
+        y_trues = np.concatenate([y_trues, label.cpu().numpy()])
+
+        metric = calc_cls_measures(y_probs, y_trues)
+        metrics.append(metric)
+
+        # scale-2 low res batch
+        for i in range(1, len(opts.scales)):
+            s = opts.scales[i]
+            x_low_i = F.interpolate(x_low, scale_factor = s, mode='bilinear')
+            x_high_i = F.interpolate(x_high, scale_factor = s, mode='bilinear')
+
+            x_low_i, x_high_i = move_to([x_low_i, x_high_i], opts.device)
+
+            optimizer.zero_grad()
+            y, attention_map, patches, x_low_i_out = model(x_low_i, x_high_i)
+
+            entropy_loss = entropy_loss_func(attention_map)
+
+            loss = criterion(y, label) - entropy_loss
+
+            loss.backward()
+
+            torch.nn.utils.clip_grad_norm_(model.parameters(), opts.clipnorm)
+
+            optimizer.step()
+
+            loss_value = loss.item()
+
+            losses[i].append(loss_value)
+
+            y_prob = F.softmax(y, dim=1)
+            y_probs = np.concatenate([y_probs, y_prob.detach().cpu().numpy()])
+            y_trues = np.concatenate([y_trues, label.cpu().numpy()])
+
+            metric = calc_cls_measures(y_probs, y_trues)
+            metrics.append(metric)
+
+    train_loss_epoch = [np.round(np.mean(loss_s), 4) for loss_s in losses]
+    # metrics = calc_cls_measures(y_probs, y_trues)
+    return train_loss_epoch, metrics
+
+def evaluateMultiResBatches(model, test_loader, criterion, entropy_loss_func, opts):
+    """ Train for a single epoch """
+
+    y_probs = np.zeros((0, len(test_loader.dataset.CLASSES)), np.float)
+    y_trues = np.zeros((0), np.int)
+    losses = [[] for s in opts.scales]
+    metrics = []
+    # Put model in eval mode
+    model.eval()
+
+    for i, (x_low, x_high, label) in enumerate(tqdm(test_loader)):
+        # high res batch
+        x_low, x_high, label = move_to([x_low, x_high, label], opts.device)
+
+        y, attention_map, patches, x_low_out = model(x_low, x_high)
+
+        entropy_loss = entropy_loss_func(attention_map)
+
+        loss = criterion(y, label) - entropy_loss
+
+        loss_value = loss.item()
+        losses[0].append(loss_value)
+
+        y_prob = F.softmax(y, dim=1)
+        y_probs = np.concatenate([y_probs, y_prob.detach().cpu().numpy()])
+        y_trues = np.concatenate([y_trues, label.cpu().numpy()])
+
+        metric = calc_cls_measures(y_probs, y_trues)
+        metrics.append(metric)
+
+        # scale-2 low res batch
+        for i in range(1, len(opts.scales)):
+            s = opts.scales[i]
+            x_low_i = F.interpolate(x_low, scale_factor = s, mode='bilinear')[0]
+            x_high_i = F.interpolate(x_high, scale_factor = s, mode='bilinear')[0]
+
+            x_low_i, x_high_i = move_to([x_low_i, x_high_i], opts.device)
+
+            y, attention_map, patches, x_low_i_out = model(x_low_i, x_high_i)
+
+            entropy_loss = entropy_loss_func(attention_map)
+
+            loss = criterion(y, label) - entropy_loss
+
+            loss_value = loss.item()
+
+            losses[i].append(loss_value)
+
+            y_prob = F.softmax(y, dim=1)
+            y_probs = np.concatenate([y_probs, y_prob.detach().cpu().numpy()])
+            y_trues = np.concatenate([y_trues, label.cpu().numpy()])
+
+            metric = calc_cls_measures(y_probs, y_trues)
+            metrics.append(metric)
+
+    test_loss_epoch = [np.round(np.mean(loss_s), 4) for loss_s in losses]
+    # metrics = calc_cls_measures(y_probs, y_trues)
+    return test_loss_epoch, metrics
 
 def save_checkpoint(model, optimizer, save_path, epoch):
     torch.save({

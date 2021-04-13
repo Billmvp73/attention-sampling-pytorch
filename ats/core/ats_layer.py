@@ -417,3 +417,83 @@ class MultiParallelATSModel(nn.Module):
         y = self.classifier(sample_features)
 
         return y, attention_maps, patches, x_lows
+    
+
+
+class MultiAtsParallelATSModel(nn.Module):
+    """ Attention sampling model that perform the entire process of calculating the
+        attention map, sampling the patches, calculating the features of the patches,
+        the expectation and classifices the features.
+        Arguments
+        ---------
+        attention_model: pytorch model, that calculated the attention map given a low
+                         resolution input image
+        feature_model: pytorch model, that takes the patches and calculated features
+                       of the patches
+        classifier: pytorch model, that can do a classification into the number of
+                    classes for the specific problem
+        n_patches: int, the number of patches to sample
+        patch_size: int, the patch size (squared)
+        receptive_field: int, how large is the receptive field of the attention network.
+                         It is used to map the attention to high resolution patches.
+        replace: bool, if to sample with our without replacment
+        use_logts: bool, if to use logits when sampling
+    """
+
+    def __init__(self, attention_models, feature_model, classifier, n_patches, patch_size, scales,receptive_field=0,
+                 replace=False, use_logits=False):
+        super(MultiParallelATSModel, self).__init__()
+
+        self.attention_models = attention_models
+        self.feature_model = feature_model
+        self.classifier = classifier
+
+        self.multiSampler = MultiSamplePatches(n_patches, patch_size, scales, receptive_field, replace, use_logits)
+        self.sampler = SamplePatches(n_patches, patch_size, receptive_field, replace, use_logits)
+        self.expectation = Expectation(replace=replace)
+
+        self.patch_size = patch_size
+        self.n_patches = n_patches
+
+        self.scales = scales
+        assert self.scales[0] == 1
+
+
+    def forward(self, x_lows, x_highs):
+        high_ats_shape = None
+        attention_maps = []
+        multi_patches = []
+        multi_sampled_attention = []
+        for i, (x_low, x_high, scale, attention_model) in enumerate(zip(x_lows, x_highs,self.scales, self.attention_maps)):
+
+            # First we compute our attention map
+            attention_map = attention_model(x_low)
+            
+            patches, sampled_attention = self.sampler(x_low, x_high, attention_map)
+            # patches, sampled_attention = self.multiSampler(x_lows, x_highs, norm_map, max_index)
+            multi_patches.append(patches)
+            multi_sampled_attention.append(sampled_attention)
+            attention_maps.append(attention_map)
+        patches = torch.cat(multi_patches, 1)
+        sampled_attention = torch.cat(multi_sampled_attention, 1)
+        # We compute the features of the sampled patches
+        channels = patches.shape[2]
+        patches_flat = patches.view(-1, channels, self.patch_size, self.patch_size)
+        patch_features = self.feature_model(patches_flat)
+        dims = patch_features.shape[-1]
+        patch_features = patch_features.view(-1, self.n_patches * len(self.scales), dims)
+
+
+        weight_scales = torch.ones_like(sampled_attention)
+        for i, scale in enumerate(self.scales):
+            prefix = i * self.n_patches
+            for j in range(self.n_patches):
+                index = prefix + j
+                weight_scales[:, index] *= scale * scale
+        # weight_scales = torch.div(weight_scales, )
+        weight_scales = weight_scales / torch.sum(weight_scales, axis=1)[0]
+        sample_features = self.expectation(patch_features, sampled_attention / len(self.scales), weight_scales)
+
+        y = self.classifier(sample_features)
+
+        return y, attention_maps, patches, x_lows
