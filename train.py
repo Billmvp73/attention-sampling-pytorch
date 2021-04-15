@@ -241,12 +241,18 @@ def evaluateMultiResBatches(model, test_loader, criterion, entropy_loss_func, op
     # Put model in eval mode
     model.eval()
 
+    all_patches = []
+    all_maps = []
+    all_x_low = []
     for i, (x_low, x_high, label) in enumerate(tqdm(test_loader)):
         # high res batch
         x_low, x_high, label = move_to([x_low, x_high, label], opts.device)
 
         y, attention_map, patches, x_low_out = model(x_low, x_high)
-
+        if opts.visualize:
+            all_patches.append(patches)
+            all_maps.append(attention_map)
+            all_x_low.append(x_low_out)
         entropy_loss = entropy_loss_func(attention_map)
 
         loss = criterion(y, label) - entropy_loss
@@ -271,6 +277,10 @@ def evaluateMultiResBatches(model, test_loader, criterion, entropy_loss_func, op
 
             y, attention_map, patches, x_low_i_out = model(x_low_i, x_high_i)
 
+            if opts.visualize:
+                all_patches.append(patches)
+                all_maps.append(attention_map)
+                all_x_low.append(x_low_i_out)
             entropy_loss = entropy_loss_func(attention_map)
 
             loss = criterion(y, label) - entropy_loss
@@ -285,6 +295,16 @@ def evaluateMultiResBatches(model, test_loader, criterion, entropy_loss_func, op
 
             metric = calc_cls_measures(y_probs, y_trues)
             metrics.append(metric)
+
+        if opts.visualize:
+            all_patches_tensor = torch.cat(all_patches, dim=1)
+            # all_maps_tensor = torch.stack(all_maps, dim=1)
+            for b in range(patches.shape[0]):
+                batch_patches = all_patches_tensor[b]
+                patchGrid(batch_patches, (3, 5))
+                batch_maps = [attention_map[b] for attention_map in all_maps]
+                batch_imgs = [x_low_i[b] for x_low_i in all_x_low]
+                mapGrid(batch_maps, batch_imgs, opts.scales)
 
     test_loss_epoch = [np.round(np.mean(loss_s), 4) for loss_s in losses]
     # metrics = calc_cls_measures(y_probs, y_trues)

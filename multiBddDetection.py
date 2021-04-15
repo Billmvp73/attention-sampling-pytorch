@@ -98,25 +98,25 @@ def main(opts):
 
     for epoch in range(start_epoch, opts.epochs):
         print("Start epoch %d"%epoch)
-        train_loss, train_metrics = trainMultiResBatches(ats_model, optimizer, train_loader, criterion, entropy_loss_func, opts)
-        if epoch % 2 == 0:
-          save_checkpoint(ats_model, optimizer, os.path.join(opts.checkpoint_path, "checkpoint{:02d}.pth".format(epoch)), epoch)
-          print("Save "+os.path.join(opts.checkpoint_path, "checkpoint{:02d}.pth".format(epoch))+" successfully.")
-        if not opts.multiResBatch:
-          print("Epoch {}, train loss: {:.3f}, train metrics: {:.3f}".format(epoch, train_loss, train_metrics["accuracy"]))
-        else:
-          scale_avg = [[], []]
-          for i, s in enumerate(opts.scales):
-            print("Epoch {}, scale {}, train loss: {:.3f}, train metrics: {:.3f}".format(epoch, s, train_loss[i], train_metrics[i]["accuracy"]))
-            scale_avg[0].append(train_loss[i])
-            scale_avg[1].append(train_metrics[i]['accuracy'])
-          avg_train_loss = np.round(np.mean(scale_avg[0]), 4)
-          avg_train_metrics = np.mean(scale_avg[1])
-          print("Epoch {}, avg train loss: {:.3f}, train metrics: {:.3f}".format(epoch, avg_train_loss, avg_train_metrics))
+        # train_loss, train_metrics = trainMultiResBatches(ats_model, optimizer, train_loader, criterion, entropy_loss_func, opts)
+        # if epoch % 2 == 0:
+        #   save_checkpoint(ats_model, optimizer, os.path.join(opts.checkpoint_path, "checkpoint{:02d}.pth".format(epoch)), epoch)
+        #   print("Save "+os.path.join(opts.checkpoint_path, "checkpoint{:02d}.pth".format(epoch))+" successfully.")
+        # if not opts.multiResBatch:
+        #   print("Epoch {}, train loss: {:.3f}, train metrics: {:.3f}".format(epoch, train_loss, train_metrics["accuracy"]))
+        # else:
+        #   scale_avg = [[], []]
+        #   for i, s in enumerate(opts.scales):
+        #     print("Epoch {}, scale {}, train loss: {:.3f}, train metrics: {:.3f}".format(epoch, s, train_loss[i], train_metrics[i]["accuracy"]))
+        #     scale_avg[0].append(train_loss[i])
+        #     scale_avg[1].append(train_metrics[i]['accuracy'])
+        #   avg_train_loss = np.round(np.mean(scale_avg[0]), 4)
+        #   avg_train_metrics = np.mean(scale_avg[1])
+        #   print("Epoch {}, avg train loss: {:.3f}, train metrics: {:.3f}".format(epoch, avg_train_loss, avg_train_metrics))
         with torch.no_grad():
             test_loss, test_metrics = evaluateMultiResBatches(ats_model, test_loader, criterion, entropy_loss_func, opts)
 
-        logger(epoch, (train_loss, test_loss), (train_metrics, test_metrics))
+        # logger(epoch, (train_loss, test_loss), (train_metrics, test_metrics))
         if not opts.multiResBatch:
           print("Epoch {}, test loss: {:.3f}, test metrics: {:.3f}".format(epoch, test_loss, test_metrics["accuracy"]))
         else:
