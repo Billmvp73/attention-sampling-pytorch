@@ -10,7 +10,7 @@ from models.attention_model import AttentionModelBddDetection, AttentionModelMul
 from models.feature_model import FeatureModelBddDetection
 from models.classifier import ClassificationHead
 
-from ats.core.ats_layer import ATSModel, MultiATSModel, MultiParallelATSModel
+from ats.core.ats_layer import ATSModel, MultiATSModel, MultiParallelATSModel, MultiAtsParallelATSModel
 from ats.utils.regularizers import MultinomialEntropy
 from ats.utils.logging import AttentionSaverMultiBddDetection, AttentionSaverMultiParallelBddDetection, AttentionSaverMultiBatchBddDetection
 
@@ -42,7 +42,13 @@ def main(opts):
       if opts.map_parallel:
           print("Run parallel model.")
           print("n patches for high res, and another n for low res.")
-          ats_model = MultiParallelATSModel(attention_model, feature_model, classification_head, n_patches=opts.n_patches, patch_size=opts.patch_size, scales=opts.scales)
+          if opts.parallel_models:
+            print("Multiple attention models for multiple scales.")
+            attention_models = [AttentionModelBddDetection(squeeze_channels=True, softmax_smoothing=1e-4)for _ in opts.scales]
+            ats_model = MultiAtsParallelATSModel(attention_models, feature_model, classification_head, n_patches=opts.n_patches, patch_size=opts.patch_size, scales=opts.scales)
+          else:
+            print("Single attention models for multiple scales.")
+            ats_model = MultiParallelATSModel(attention_model, feature_model, classification_head, n_patches=opts.n_patches, patch_size=opts.patch_size, scales=opts.scales)
           ats_model = ats_model.to(opts.device)
 
           logger = AttentionSaverMultiParallelBddDetection(opts.output_dir, ats_model, test_dataset, opts)
