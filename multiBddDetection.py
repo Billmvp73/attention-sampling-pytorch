@@ -64,7 +64,7 @@ def main(opts):
         feature_model = FeatureModelBddDetection(in_channels=3, strides=[1, 2, 2, 2], filters=[32, 32, 32, 32])
         classification_head = ClassificationHead(in_channels=32, num_classes=len(train_dataset.CLASSES))
 
-        ats_model = ATSModel(attention_model, feature_model, classification_head, n_patches=opts.n_patches, patch_size=opts.patch_size)
+        ats_model = ATSModel(attention_model, feature_model, classification_head, n_patches=opts.n_patches, patch_size=opts.patch_size, replace=True)
         ats_model = ats_model.to(opts.device)
         logger = AttentionSaverMultiBatchBddDetection(opts.output_dir, ats_model, test_dataset, opts)
     # ats_model = ats_model.to(opts.device)
@@ -98,23 +98,30 @@ def main(opts):
 
     for epoch in range(start_epoch, opts.epochs):
         print("Start epoch %d"%epoch)
-        # train_loss, train_metrics = trainMultiResBatches(ats_model, optimizer, train_loader, criterion, entropy_loss_func, opts)
-        # if epoch % 2 == 0:
-        #   save_checkpoint(ats_model, optimizer, os.path.join(opts.checkpoint_path, "checkpoint{:02d}.pth".format(epoch)), epoch)
-        #   print("Save "+os.path.join(opts.checkpoint_path, "checkpoint{:02d}.pth".format(epoch))+" successfully.")
-        # if not opts.multiResBatch:
-        #   print("Epoch {}, train loss: {:.3f}, train metrics: {:.3f}".format(epoch, train_loss, train_metrics["accuracy"]))
-        # else:
-        #   scale_avg = [[], []]
-        #   for i, s in enumerate(opts.scales):
-        #     print("Epoch {}, scale {}, train loss: {:.3f}, train metrics: {:.3f}".format(epoch, s, train_loss[i], train_metrics[i]["accuracy"]))
-        #     scale_avg[0].append(train_loss[i])
-        #     scale_avg[1].append(train_metrics[i]['accuracy'])
-        #   avg_train_loss = np.round(np.mean(scale_avg[0]), 4)
-        #   avg_train_metrics = np.mean(scale_avg[1])
-        #   print("Epoch {}, avg train loss: {:.3f}, train metrics: {:.3f}".format(epoch, avg_train_loss, avg_train_metrics))
+        if not opts.visualize:
+          if opts.multiResBatch:
+            train_loss, train_metrics = trainMultiResBatches(ats_model, optimizer, train_loader, criterion, entropy_loss_func, opts)
+          else:
+            train_loss, train_metrics = trainMultiRes(ats_model, optimizer, train_loader, criterion, entropy_loss_func, opts)
+          if epoch % 2 == 0:
+            save_checkpoint(ats_model, optimizer, os.path.join(opts.checkpoint_path, "checkpoint{:02d}.pth".format(epoch)), epoch)
+            print("Save "+os.path.join(opts.checkpoint_path, "checkpoint{:02d}.pth".format(epoch))+" successfully.")
+          if not opts.multiResBatch:
+            print("Epoch {}, train loss: {:.3f}, train metrics: {:.3f}".format(epoch, train_loss, train_metrics["accuracy"]))
+          else:
+            scale_avg = [[], []]
+            for i, s in enumerate(opts.scales):
+              print("Epoch {}, scale {}, train loss: {:.3f}, train metrics: {:.3f}".format(epoch, s, train_loss[i], train_metrics[i]["accuracy"]))
+              scale_avg[0].append(train_loss[i])
+              scale_avg[1].append(train_metrics[i]['accuracy'])
+            avg_train_loss = np.round(np.mean(scale_avg[0]), 4)
+            avg_train_metrics = np.mean(scale_avg[1])
+            print("Epoch {}, avg train loss: {:.3f}, train metrics: {:.3f}".format(epoch, avg_train_loss, avg_train_metrics))
         with torch.no_grad():
+          if opts.multiResBatch:
             test_loss, test_metrics = evaluateMultiResBatches(ats_model, test_loader, criterion, entropy_loss_func, opts)
+          else:
+            test_loss, test_metrics = evaluateMultiRes(ats_model, test_loader, criterion, entropy_loss_func, opts)
 
         # logger(epoch, (train_loss, test_loss), (train_metrics, test_metrics))
         if not opts.multiResBatch:

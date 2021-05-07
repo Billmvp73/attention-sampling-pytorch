@@ -355,7 +355,7 @@ class AttentionSaverMultiBatchBddDetection:
     def on_train_begin(self):
         opts = self.opts
         with torch.no_grad():
-            _, _, _, x_low = self.ats_model(self.x_low.to(opts.device), self.x_high.to(opts.device))
+            _, _, _, x_low,_ = self.ats_model(self.x_low.to(opts.device), self.x_high.to(opts.device))
             x_low = x_low.cpu()
             image_list = [x for x in x_low]
 
@@ -367,7 +367,7 @@ class AttentionSaverMultiBatchBddDetection:
     def __call__(self, epoch, losses=None, metrics=None):
         opts = self.opts
         with torch.no_grad():
-            _, att, _, x_low = self.ats_model(self.x_low.to(opts.device), self.x_high.to(opts.device))
+            _, att, _, x_low,_ = self.ats_model(self.x_low.to(opts.device), self.x_high.to(opts.device))
             att = att.unsqueeze(1)
             att = F.interpolate(att, size=(x_low.shape[-2], x_low.shape[-1]))
             att = att.cpu()

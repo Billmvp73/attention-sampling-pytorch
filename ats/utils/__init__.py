@@ -1,6 +1,6 @@
 """Provide utility functions to the rest of the modules."""
 from functools import partial
-
+import seaborn as sb
 import torch
 import matplotlib.pyplot as plt
 
@@ -57,9 +57,9 @@ def showPatch(patch, img):
     # visualize(patch)
     # visualize(img)
 
-def patchGrid(patches, size):
+def patchGrid(patches, maps, imgs, size):
     row, col = size
-    figs, axs = plt.subplots(row, col)
+    figs, axs = plt.subplots(row+2, col)
     for i in range(patches.shape[0]):
         r = i // col
         c = i % col
@@ -67,6 +67,16 @@ def patchGrid(patches, size):
         axs[r, c].imshow(np_patch)
         axs[r, c].set_title("Patch(%d)"%(i))
         axs[r, c].axis("off")
+    for i in range(len(maps)):
+        map = maps[i]
+        img = imgs[i]
+        axs[-2, i].imshow(map)
+        axs[-2, i].set_title("Map(%d)"%(i))
+        axs[-2, i].axis("off")
+        axs[-1, i].imshow(img.cpu().numpy().transpose(1, 2, 0))
+        axs[-1, i].set_title("Low(%d)"%(i))
+        axs[-1, i].axis("off")
+    # plt.colorbar()
     plt.show()
     plt.clf()
     plt.close()

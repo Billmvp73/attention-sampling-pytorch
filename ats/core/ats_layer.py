@@ -58,6 +58,7 @@ class SamplePatches(nn.Module):
             replace=self._replace,
             use_logits=self._use_logits
         )
+        # print(sampled_attention)
 
         offsets = torch.zeros_like(samples).float()
         if self._receptive_field > 0:
@@ -133,7 +134,7 @@ class ATSModel(nn.Module):
 
         y = self.classifier(sample_features)
 
-        return y, attention_map, patches, x_low
+        return y, attention_map, patches, x_low, sampled_attention
 
 #---------- Start Processing MultiResolution Images -----
 
@@ -413,6 +414,7 @@ class MultiParallelATSModel(nn.Module):
         # weight_scales = torch.div(weight_scales, )
         weight_scales = weight_scales / torch.sum(weight_scales, axis=1)[0]
         sample_features = self.expectation(patch_features, sampled_attention / len(self.scales), weight_scales)
+        # sample_features = self.expectation(patch_features, sampled_attention / len(self.scales))
 
         y = self.classifier(sample_features)
 
@@ -464,7 +466,7 @@ class MultiAtsParallelATSModel(nn.Module):
         attention_maps = []
         multi_patches = []
         multi_sampled_attention = []
-        for i, (x_low, x_high, scale, attention_model) in enumerate(zip(x_lows, x_highs,self.scales, self.attention_maps)):
+        for i, (x_low, x_high, scale, attention_model) in enumerate(zip(x_lows, x_highs,self.scales, self.attention_models)):
 
             # First we compute our attention map
             attention_map = attention_model(x_low)
