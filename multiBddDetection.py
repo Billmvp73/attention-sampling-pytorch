@@ -161,6 +161,7 @@ if __name__ == '__main__':
     parser.add_argument("--output_dir", type=str, help="An output directory", default='output/bdd_detection')
     # parser.add_argument("--checkpoint_path", type=str, help="An output checkpoint directory", default='output/bdd_detection/checkpoint')
     parser.add_argument("--map_parallel", type=bool, default=False)
+    parser.add_argument("--parallel_models", type=bool, default=False)
     parser.add_argument("--area_norm", type=bool, default=False)
     parser.add_argument("--resume", type=bool, default=False)
     parser.add_argument("--multiResBatch", type=bool, default=False, help="Flag to train multiresolution in separate batches")
