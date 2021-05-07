@@ -74,9 +74,16 @@ def main(opts):
         ats_model = ats_model.to(opts.device)
         logger = AttentionSaverMultiBatchBddDetection(opts.output_dir, ats_model, test_dataset, opts)
     # ats_model = ats_model.to(opts.device)
-    optimizer = optim.Adam([{'params': ats_model.attention_model.part1.parameters(), 'weight_decay': 1e-5},
+    if not opts.parallel_models:
+      optimizer = optim.Adam([{'params': ats_model.attention_model.part1.parameters(), 'weight_decay': 1e-5},
                             {'params': ats_model.attention_model.part2.parameters()},
                             {'params': ats_model.feature_model.parameters()},
+                            {'params': ats_model.classifier.parameters()},
+                            {'params': ats_model.sampler.parameters()},
+                            {'params': ats_model.expectation.parameters()}
+                            ], lr=opts.lr)
+    else:
+      optimizer = optim.Adam([{'params': ats.part1.parameters(), 'weight_decay': 1e-5} for ats in ats_model.attention_models] +               [{'params': ats.part2.parameters()} for ats in ats_model.attention_models] + [{'params': ats_model.feature_model.parameters()},
                             {'params': ats_model.classifier.parameters()},
                             {'params': ats_model.sampler.parameters()},
                             {'params': ats_model.expectation.parameters()}
