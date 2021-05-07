@@ -44,7 +44,7 @@ def main(opts):
           print("n patches for high res, and another n for low res.")
           if opts.parallel_models:
             print("Multiple attention models for multiple scales.")
-            attention_models = [AttentionModelBddDetection(squeeze_channels=True, softmax_smoothing=1e-4)for _ in opts.scales]
+            attention_models = [AttentionModelBddDetection(squeeze_channels=True, softmax_smoothing=1e-4).to(opts.device) for _ in opts.scales]
             ats_model = MultiAtsParallelATSModel(attention_models, feature_model, classification_head, n_patches=opts.n_patches, patch_size=opts.patch_size, scales=opts.scales)
           else:
             print("Single attention models for multiple scales.")
