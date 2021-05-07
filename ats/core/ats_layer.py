@@ -444,7 +444,7 @@ class MultiAtsParallelATSModel(nn.Module):
 
     def __init__(self, attention_models, feature_model, classifier, n_patches, patch_size, scales,receptive_field=0,
                  replace=False, use_logits=False):
-        super(MultiParallelATSModel, self).__init__()
+        super(MultiAtsParallelATSModel, self).__init__()
 
         self.attention_models = attention_models
         self.feature_model = feature_model
