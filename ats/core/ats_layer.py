@@ -3,7 +3,7 @@ import torch.nn as nn
 import pdb
 import torch.nn.functional as F
 from ..data.from_tensors import FromTensors, FromMultiTensors
-from .sampling import sample, multisample
+from .sampling import sample, multisample, norm_resample
 from .expectation import Expectation
 from ..utils.layers import SampleSoftmax
 
@@ -369,8 +369,9 @@ class MultiParallelATSModel(nn.Module):
         self.feature_model = feature_model
         self.classifier = classifier
 
-        self.multiSampler = MultiSamplePatches(n_patches, patch_size, scales, receptive_field, replace, use_logits)
+        # self.multiSampler = MultiSamplePatches(n_patches, patch_size, scales, receptive_field, replace, use_logits)
         self.sampler = SamplePatches(n_patches, patch_size, receptive_field, replace, use_logits)
+    
         self.expectation = Expectation(replace=replace)
 
         self.patch_size = patch_size
@@ -418,7 +419,7 @@ class MultiParallelATSModel(nn.Module):
 
         y = self.classifier(sample_features)
 
-        return y, attention_maps, patches, x_lows
+        return y, attention_maps, patches, x_lows, patch_features
     
 
 
@@ -443,7 +444,7 @@ class MultiAtsParallelATSModel(nn.Module):
     """
 
     def __init__(self, attention_models, feature_model, classifier, n_patches, patch_size, scales,receptive_field=0,
-                 replace=False, use_logits=False):
+                 replace=False, use_logits=False, norm_resample=False):
         super(MultiAtsParallelATSModel, self).__init__()
 
         self.attention_models = attention_models
@@ -459,7 +460,7 @@ class MultiAtsParallelATSModel(nn.Module):
 
         self.scales = scales
         assert self.scales[0] == 1
-
+        self.norm_resample = norm_resample
 
     def forward(self, x_lows, x_highs):
         high_ats_shape = None
@@ -476,26 +477,31 @@ class MultiAtsParallelATSModel(nn.Module):
             multi_patches.append(patches)
             multi_sampled_attention.append(sampled_attention)
             attention_maps.append(attention_map)
-        patches = torch.cat(multi_patches, 1)
-        sampled_attention = torch.cat(multi_sampled_attention, 1)
+        if self.norm_resample:
+            patches, sampled_attention, unnorm_atts = norm_resample(self.n_patches, multi_patches, multi_sampled_attention, self.scales)
+        else:
+            patches = torch.cat(multi_patches, 1)
+            sampled_attention = torch.cat(multi_sampled_attention, 1)
         # We compute the features of the sampled patches
         channels = patches.shape[2]
         patches_flat = patches.view(-1, channels, self.patch_size, self.patch_size)
         patch_features = self.feature_model(patches_flat)
         dims = patch_features.shape[-1]
-        patch_features = patch_features.view(-1, self.n_patches * len(self.scales), dims)
+        patch_features = patch_features.view(-1, self.n_patches, dims)
 
-
-        weight_scales = torch.ones_like(sampled_attention)
-        for i, scale in enumerate(self.scales):
-            prefix = i * self.n_patches
-            for j in range(self.n_patches):
-                index = prefix + j
-                weight_scales[:, index] *= scale * scale
-        # weight_scales = torch.div(weight_scales, )
-        weight_scales = weight_scales / torch.sum(weight_scales, axis=1)[0]
-        sample_features = self.expectation(patch_features, sampled_attention / len(self.scales), weight_scales)
+        if not self.norm_resample:
+            weight_scales = torch.ones_like(sampled_attention)
+            for i, scale in enumerate(self.scales):
+                prefix = i * self.n_patches
+                for j in range(self.n_patches):
+                    index = prefix + j
+                    weight_scales[:, index] *= scale * scale
+            # weight_scales = torch.div(weight_scales, )
+            weight_scales = weight_scales / torch.sum(weight_scales, axis=1)[0]
+            sample_features = self.expectation(patch_features, sampled_attention / len(self.scales), weight_scales)
+        else:
+            sample_features = self.expectation(patch_features, sampled_attention, unnorm_atts)
 
         y = self.classifier(sample_features)
 
-        return y, attention_maps, patches, x_lows
+        return y, attention_maps, patches, x_lows, patch_features

@@ -45,7 +45,11 @@ def main(opts):
           if opts.parallel_models:
             print("Multiple attention models for multiple scales.")
             attention_models = [AttentionModelBddDetection(squeeze_channels=True, softmax_smoothing=1e-4).to(opts.device) for _ in opts.scales]
-            ats_model = MultiAtsParallelATSModel(attention_models, feature_model, classification_head, n_patches=opts.n_patches, patch_size=opts.patch_size, scales=opts.scales)
+            if not opts.norm_resample:
+              ats_model = MultiAtsParallelATSModel(attention_models, feature_model, classification_head, n_patches=opts.n_patches, patch_size=opts.patch_size, scales=opts.scales)
+            else:
+              # Normalize the probability of samples among all scales
+              ats_model = MultiAtsParallelATSModel(attention_models, feature_model, classification_head, n_patches=opts.n_patches, patch_size=opts.patch_size, scales=opts.scales, norm_resample=True)
           else:
             print("Single attention models for multiple scales.")
             ats_model = MultiParallelATSModel(attention_model, feature_model, classification_head, n_patches=opts.n_patches, patch_size=opts.patch_size, scales=opts.scales)
@@ -83,11 +87,7 @@ def main(opts):
                             {'params': ats_model.expectation.parameters()}
                             ], lr=opts.lr)
     else:
-      optimizer = optim.Adam([{'params': ats.part1.parameters(), 'weight_decay': 1e-5} for ats in ats_model.attention_models] +               [{'params': ats.part2.parameters()} for ats in ats_model.attention_models] + [{'params': ats_model.feature_model.parameters()},
-                            {'params': ats_model.classifier.parameters()},
-                            {'params': ats_model.sampler.parameters()},
-                            {'params': ats_model.expectation.parameters()}
-                            ], lr=opts.lr)
+      optimizer = optim.Adam([{'params': ats.part1.parameters(), 'weight_decay': 1e-5} for ats in ats_model.attention_models] + [{'params': ats.part2.parameters()} for ats in ats_model.attention_models] + [{'params': ats_model.feature_model.parameters()}, {'params': ats_model.classifier.parameters()}, {'params': ats_model.sampler.parameters()},{'params': ats_model.expectation.parameters()}], lr=opts.lr)
     scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=opts.decrease_lr_at, gamma=0.1)
 
     
@@ -135,8 +135,7 @@ def main(opts):
             test_loss, test_metrics = evaluateMultiResBatches(ats_model, test_loader, criterion, entropy_loss_func, opts)
           else:
             test_loss, test_metrics = evaluateMultiRes(ats_model, test_loader, criterion, entropy_loss_func, opts)
-
-        # logger(epoch, (train_loss, test_loss), (train_metrics, test_metrics))
+        logger(epoch, (train_loss, test_loss), (train_metrics, test_metrics))
         if not opts.multiResBatch:
           print("Epoch {}, test loss: {:.3f}, test metrics: {:.3f}".format(epoch, test_loss, test_metrics["accuracy"]))
         else:
@@ -169,6 +168,7 @@ if __name__ == '__main__':
     # parser.add_argument("--checkpoint_path", type=str, help="An output checkpoint directory", default='output/bdd_detection/checkpoint')
     parser.add_argument("--map_parallel", type=bool, default=False)
     parser.add_argument("--parallel_models", type=bool, default=False)
+    parser.add_argument("--norm_resample", type=bool, default=False)
     parser.add_argument("--area_norm", type=bool, default=False)
     parser.add_argument("--resume", type=bool, default=False)
     parser.add_argument("--multiResBatch", type=bool, default=False, help="Flag to train multiresolution in separate batches")

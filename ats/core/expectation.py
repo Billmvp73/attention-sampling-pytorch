@@ -120,8 +120,9 @@ class Expectation(nn.Module):
 
         self.E = ExpectWithReplacement() if replace else ExpectWithoutReplacement()
 
-    def forward(self, features, attention, weights=None):
+    def forward(self, features, attention, unnorm_atts=None, weights=None):
         if weights is None:
             weights = torch.ones_like(attention) / float(attention.shape[1])
-
+        if unnorm_atts is not None:
+            attention = unnorm_atts
         return self.E.apply(weights, attention, features)

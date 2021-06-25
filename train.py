@@ -87,18 +87,21 @@ def trainMultiRes(model, optimizer, train_loader, criterion, entropy_loss_func, 
         x_lows, x_highs, label = move_to([x_lows, x_highs, label], opts.device)
 
         optimizer.zero_grad()
-        y, attention_maps, patches, x_lows = model(x_lows, x_highs)
+        y, attention_maps, patches, x_lows, patch_features = model(x_lows, x_highs)
        
         if type(attention_maps) is list:
             # for attention_map in attention_maps:
             #     print(torch.max(attention_map))
             #     print(torch.min(attention_map))
             entropy_loss = torch.tensor([entropy_loss_func(attention_map) for attention_map in attention_maps]).sum() / len(opts.scales)
+            # entropy_loss = torch.tensor([entropy_loss_func(attention_map * scale ** 2) for attention_map, scale in zip(attention_maps, opts.scales)]).sum() / len(opts.scales)
 
             loss = criterion(y, label) - entropy_loss
         else:
             entropy_loss = entropy_loss_func(attention_maps)
             loss = criterion(y, label) - entropy_loss
+        if loss < 0:
+            print("Something is wrong with the loss.")
         loss.backward()
         torch.nn.utils.clip_grad_norm_(model.parameters(), opts.clipnorm)
         optimizer.step()
@@ -129,7 +132,7 @@ def evaluateMultiRes(model, test_loader, criterion, entropy_loss_func, opts):
 
         x_lows, x_highs, label = move_to([x_lows, x_highs, label], opts.device)
 
-        y, attention_maps, patches, x_lows = model(x_lows, x_highs)
+        y, attention_maps, patches, x_lows, patch_features = model(x_lows, x_highs)
 
         ## visualize
         # for i, (scale, x_low) in  enumerate(zip(model.scales, x_lows)):
@@ -155,20 +158,33 @@ def evaluateMultiRes(model, test_loader, criterion, entropy_loss_func, opts):
 
         if opts.visualize:
             for b in range(patches.shape[0]):
+                print("expectation prediction: ", y_probs[b])
+                print("label prediction: ", label[0])
                 batch_patches = patches[b]
+                patch_feature = patch_features[b]
+                y_patch = model.classifier(patch_feature)
+                y_patch_prop = F.softmax(y_patch, dim=1)
+                # print("patch %d: "%b, y_patch)
+                # print("probability %d: " % b, y_patch_prop)
+                predicted = []
+                for prob in y_patch_prop:
+                    if prob[0] >= prob[1]:
+                        predicted.append(0)
+                    else:
+                        predicted.append(1)
                 # patchGrid(batch_patches, (3, 5))
                 if type(attention_maps) is list:
                     batch_maps = [attention_map[b].cpu().numpy() for attention_map in attention_maps]
-                    for attention_map in batch_maps:
-                        print(np.max(attention_map))
-                        print(np.min(attention_map))
+                    # for attention_map in batch_maps:
+                    #     print(np.max(attention_map))
+                    #     print(np.min(attention_map))
                     # batch_maps = [attention_maps[i][b] for i in range(len(model.scales))]
                 else:
                     # batch_maps = [attention_maps[b] for i in range(len(model.scales))]
                     batch_maps = [attention_maps[b].cpu().numpy()]
                 batch_imgs = [x_lows[i][b] for i in range(len(model.scales))]
                 # mapGrid(batch_maps, batch_imgs, model.scales)
-                patchGrid(batch_patches, batch_maps, batch_imgs, (3, 5))
+                patchGrid(batch_patches, batch_maps, batch_imgs, (3, 5), predicted)
 
     test_loss_epoch = np.round(np.mean(losses), 4)
     metrics = calc_cls_measures(y_probs, y_trues)

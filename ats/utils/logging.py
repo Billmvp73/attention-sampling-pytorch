@@ -266,7 +266,7 @@ class AttentionSaverMultiParallelBddDetection:
             for x_low, x_high in zip(self.x_lows, self.x_highs):
                 lows.append(x_low.to(opts.device))
                 highs.append(x_high.to(opts.device))
-            _, _, _, x_lows = self.ats_model(lows, highs)
+            _, _, _, x_lows, _ = self.ats_model(lows, highs)
             x_lows = [x_low.cpu() for x_low in x_lows]
             image_lists = [[x for x in x_low] for x_low in x_lows]
         for scale, image_list in zip(self.opts.scales, image_lists):
@@ -283,7 +283,7 @@ class AttentionSaverMultiParallelBddDetection:
             for x_low, x_high in zip(self.x_lows, self.x_highs):
                 lows.append(x_low.to(opts.device))
                 highs.append(x_high.to(opts.device))
-            _, atts, _, x_lows = self.ats_model(lows, highs)
+            _, atts, _, x_lows, _ = self.ats_model(lows, highs)
             atts = [att.unsqueeze(1) for att in atts]
             atts = [F.interpolate(att, size=(x_low.shape[-2], x_low.shape[-1])).cpu() for att, x_low in zip(atts, x_lows)]
             # att = att.cpu()

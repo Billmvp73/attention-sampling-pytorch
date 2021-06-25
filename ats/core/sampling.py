@@ -25,6 +25,45 @@ def unravel_index(index, shape):
         index = index // dim
     return torch.stack(tuple(reversed(out)))
 
+def norm_resample(n_samples, multi_samples, multi_attention, scales, replace = False, use_logits=False):
+    """Sample the top k ones from the previously sampled k patches per scale.
+
+    n sampled patches for one scale, n*k in total, (batch_size, n_samples, k, n_dims)
+    multi_sampled_attentions (b, n, k)
+    """
+    # if use_logits:
+    #     multi_logits = multi_attention
+    # else:
+    #     multi_logits = [torch.log(attention) for attention in multi_attention]
+    
+    # sampling_function = (_sample_with_replacement if replace else _sample_without_replacement)
+    
+    """
+    First normalize the sampled attention.
+    """
+    norm_atts = []
+    for i, scale in enumerate(scales):
+        norm_att_i = multi_attention[i]*scale**2
+        norm_atts.append(norm_att_i)
+    # norm_atts = torch.stack(norm_atts)
+    norm_atts = torch.cat(norm_atts, 1)
+    unnorm_atts = torch.cat(multi_attention, 1)
+    top_atts, top_ind = torch.topk(norm_atts, n_samples, 1)
+    unnorm_top_atts = torch.gather(unnorm_atts, 1, top_ind)
+    batch_size = top_atts.shape[0]
+    total_samples = torch.cat(multi_samples, 1)
+    total_num, c, s0, s1 = total_samples.shape[1:]
+
+    total_samples = total_samples.reshape(batch_size, total_num, -1)
+    #gather samples given topk indices
+    expand_indices = top_ind.unsqueeze(2).expand(-1, -1, total_samples.shape[-1])
+    top_samples = torch.gather(total_samples, 1, expand_indices).reshape(batch_size, n_samples, c, s0, s1)
+
+    # top_samples = multi_samples[top_ind]
+    # return top_samples, top_atts, unnorm_top_atts # TODO: why the loss could be negative? The attentions associated with the patches are too small?
+    return top_samples, unnorm_top_atts, unnorm_top_atts
+    # Flatten the attention distribution and sampel from it
+    
 
 def sample(n_samples, attention, sample_space, replace=False,
            use_logits=False):
