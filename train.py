@@ -125,7 +125,7 @@ def evaluateMultiRes(model, test_loader, criterion, entropy_loss_func, opts):
     y_probs = np.zeros((0, len(test_loader.dataset.CLASSES)), np.float)
     y_trues = np.zeros((0), np.int)
     losses = []
-
+    total_sampled_scales = np.zeros(len(opts.scales), dtype=np.int)
     # Put model in eval mode
     model.eval()
 
@@ -146,6 +146,9 @@ def evaluateMultiRes(model, test_loader, criterion, entropy_loss_func, opts):
             entropy_loss = torch.tensor([entropy_loss_func(attention_map) for attention_map in attention_maps]).sum() / len(opts.scales)
 
             loss = criterion(y, label) - entropy_loss
+            if sampled_scales is not None:
+                freq_sampled_scales = np.bincount(sampled_scales.data.cpu().numpy().reshape(-1))
+                total_sampled_scales += freq_sampled_scales
         else:
             entropy_loss = entropy_loss_func(attention_maps)
             loss = criterion(y, label) - entropy_loss
@@ -191,6 +194,7 @@ def evaluateMultiRes(model, test_loader, criterion, entropy_loss_func, opts):
 
     test_loss_epoch = np.round(np.mean(losses), 4)
     metrics = calc_cls_measures(y_probs, y_trues)
+    print("Sampled scale frequencies: ", total_sampled_scales)
     return test_loss_epoch, metrics
 
 def trainMultiResBatches(model, optimizer, train_loader, criterion, entropy_loss_func, opts):
