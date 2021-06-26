@@ -87,7 +87,7 @@ def trainMultiRes(model, optimizer, train_loader, criterion, entropy_loss_func, 
         x_lows, x_highs, label = move_to([x_lows, x_highs, label], opts.device)
 
         optimizer.zero_grad()
-        y, attention_maps, patches, x_lows, patch_features = model(x_lows, x_highs)
+        y, attention_maps, patches, x_lows, patch_features, sampled_scales = model(x_lows, x_highs)
        
         if type(attention_maps) is list:
             # for attention_map in attention_maps:
@@ -132,7 +132,7 @@ def evaluateMultiRes(model, test_loader, criterion, entropy_loss_func, opts):
 
         x_lows, x_highs, label = move_to([x_lows, x_highs, label], opts.device)
 
-        y, attention_maps, patches, x_lows, patch_features = model(x_lows, x_highs)
+        y, attention_maps, patches, x_lows, patch_features, sampled_scales = model(x_lows, x_highs)
 
         ## visualize
         # for i, (scale, x_low) in  enumerate(zip(model.scales, x_lows)):
@@ -160,6 +160,8 @@ def evaluateMultiRes(model, test_loader, criterion, entropy_loss_func, opts):
             for b in range(patches.shape[0]):
                 print("expectation prediction: ", y_probs[b])
                 print("label prediction: ", label[0])
+                if sampled_scales is not None:
+                    print("sampled patch scales: ", sampled_scales[b])
                 batch_patches = patches[b]
                 patch_feature = patch_features[b]
                 y_patch = model.classifier(patch_feature)

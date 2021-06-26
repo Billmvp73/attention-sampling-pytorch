@@ -42,14 +42,16 @@ def norm_resample(n_samples, multi_samples, multi_attention, scales, norm_atts_w
     First normalize the sampled attention.
     """
     norm_atts = []
+    # scale[i] is the ratio of the number of patches at scale 1 to the number of patches at scale s[i]
     for i, scale in enumerate(scales):
-        norm_att_i = multi_attention[i]*scale**2
+        norm_att_i = multi_attention[i]*scale
         norm_atts.append(norm_att_i)
     # norm_atts = torch.stack(norm_atts)
     norm_atts = torch.cat(norm_atts, 1)
     unnorm_atts = torch.cat(multi_attention, 1)
     top_atts, top_ind = torch.topk(norm_atts, n_samples, 1)
     unnorm_top_atts = torch.gather(unnorm_atts, 1, top_ind)
+    sampled_scales = top_ind // n_samples
     batch_size = top_atts.shape[0]
     total_samples = torch.cat(multi_samples, 1)
     total_num, c, s0, s1 = total_samples.shape[1:]
@@ -61,8 +63,8 @@ def norm_resample(n_samples, multi_samples, multi_attention, scales, norm_atts_w
 
     # top_samples = multi_samples[top_ind]
     if norm_atts_weight:
-        return top_samples, top_atts, unnorm_top_atts # TODO: why the loss could be negative? The attentions associated with the patches are too small?
-    return top_samples, unnorm_top_atts, unnorm_top_atts
+        return top_samples, top_atts, unnorm_top_atts, sampled_scales # TODO: why the loss could be negative? The attentions associated with the patches are too small?
+    return top_samples, unnorm_top_atts, unnorm_top_atts, sampled_scales
     # Flatten the attention distribution and sampel from it
     
 

@@ -468,19 +468,26 @@ class MultiAtsParallelATSModel(nn.Module):
         attention_maps = []
         multi_patches = []
         multi_sampled_attention = []
+        ratio_scales = []
+        
         for i, (x_low, x_high, scale, attention_model) in enumerate(zip(x_lows, x_highs,self.scales, self.attention_models)):
-
+            
             # First we compute our attention map
             attention_map = attention_model(x_low)
-            
+            if scale == 1:
+                scale_num_base = attention_map.shape[1]*attention_map.shape[2]
+                ratio_scales.append(1)
+            else:
+                ratio_scales.append(attention_map.shape[1] * attention_map.shape[2]/scale_num_base)
             patches, sampled_attention = self.sampler(x_low, x_high, attention_map)
             # patches, sampled_attention = self.multiSampler(x_lows, x_highs, norm_map, max_index)
             multi_patches.append(patches)
             multi_sampled_attention.append(sampled_attention)
             attention_maps.append(attention_map)
         if self.norm_resample:
-            patches, sampled_attention, unnorm_atts = norm_resample(self.n_patches, multi_patches, multi_sampled_attention, self.scales, self.norm_atts_weight)
+            patches, sampled_attention, unnorm_atts, sampled_scales = norm_resample(self.n_patches, multi_patches, multi_sampled_attention, ratio_scales, self.norm_atts_weight)
         else:
+            sampled_scales = None
             patches = torch.cat(multi_patches, 1)
             sampled_attention = torch.cat(multi_sampled_attention, 1)
         # We compute the features of the sampled patches
@@ -505,4 +512,4 @@ class MultiAtsParallelATSModel(nn.Module):
 
         y = self.classifier(sample_features)
 
-        return y, attention_maps, patches, x_lows, patch_features
+        return y, attention_maps, patches, x_lows, patch_features, sampled_scales
