@@ -79,7 +79,7 @@ def trainMultiRes(model, optimizer, train_loader, criterion, entropy_loss_func, 
     y_probs = np.zeros((0, len(train_loader.dataset.CLASSES)), np.float)
     y_trues = np.zeros((0), np.int)
     losses = []
-
+    total_sampled_scales = np.zeros(len(opts.scales), dtype=np.int)
     # Put model in training mode
     model.train()
 
@@ -90,18 +90,18 @@ def trainMultiRes(model, optimizer, train_loader, criterion, entropy_loss_func, 
         y, attention_maps, patches, x_lows, patch_features, sampled_scales = model(x_lows, x_highs)
        
         if type(attention_maps) is list:
-            # for attention_map in attention_maps:
-            #     print(torch.max(attention_map))
-            #     print(torch.min(attention_map))
+            
             entropy_loss = torch.tensor([entropy_loss_func(attention_map) for attention_map in attention_maps]).sum() / len(opts.scales)
             # entropy_loss = torch.tensor([entropy_loss_func(attention_map * scale ** 2) for attention_map, scale in zip(attention_maps, opts.scales)]).sum() / len(opts.scales)
 
             loss = criterion(y, label) - entropy_loss
+            if sampled_scales is not None:
+                freq_sampled_scales = np.bincount(sampled_scales.data.cpu().numpy().reshape(-1))
+                total_sampled_scales += freq_sampled_scales
         else:
             entropy_loss = entropy_loss_func(attention_maps)
             loss = criterion(y, label) - entropy_loss
-        if loss < 0:
-            print("Something is wrong with the loss.")
+        
         loss.backward()
         torch.nn.utils.clip_grad_norm_(model.parameters(), opts.clipnorm)
         optimizer.step()
@@ -115,6 +115,7 @@ def trainMultiRes(model, optimizer, train_loader, criterion, entropy_loss_func, 
 
     train_loss_epoch = np.round(np.mean(losses), 4)
     metrics = calc_cls_measures(y_probs, y_trues)
+    print("Sampled scale frequencies: ", total_sampled_scales)
     return train_loss_epoch, metrics
 
 
