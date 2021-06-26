@@ -49,7 +49,7 @@ def main(opts):
               ats_model = MultiAtsParallelATSModel(attention_models, feature_model, classification_head, n_patches=opts.n_patches, patch_size=opts.patch_size, scales=opts.scales)
             else:
               # Normalize the probability of samples among all scales
-              ats_model = MultiAtsParallelATSModel(attention_models, feature_model, classification_head, n_patches=opts.n_patches, patch_size=opts.patch_size, scales=opts.scales, norm_resample=True, norm_atts_weight=True)
+              ats_model = MultiAtsParallelATSModel(attention_models, feature_model, classification_head, n_patches=opts.n_patches, patch_size=opts.patch_size, scales=opts.scales, norm_resample=True, norm_atts_weight=opts.norm_atts_weight)
           else:
             print("Single attention models for multiple scales.")
             ats_model = MultiParallelATSModel(attention_model, feature_model, classification_head, n_patches=opts.n_patches, patch_size=opts.patch_size, scales=opts.scales)
