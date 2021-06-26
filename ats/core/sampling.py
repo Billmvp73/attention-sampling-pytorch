@@ -25,7 +25,7 @@ def unravel_index(index, shape):
         index = index // dim
     return torch.stack(tuple(reversed(out)))
 
-def norm_resample(n_samples, multi_samples, multi_attention, scales, replace = False, use_logits=False):
+def norm_resample(n_samples, multi_samples, multi_attention, scales, norm_atts_weight=False, replace = False, use_logits=False):
     """Sample the top k ones from the previously sampled k patches per scale.
 
     n sampled patches for one scale, n*k in total, (batch_size, n_samples, k, n_dims)
@@ -60,7 +60,8 @@ def norm_resample(n_samples, multi_samples, multi_attention, scales, replace = F
     top_samples = torch.gather(total_samples, 1, expand_indices).reshape(batch_size, n_samples, c, s0, s1)
 
     # top_samples = multi_samples[top_ind]
-    # return top_samples, top_atts, unnorm_top_atts # TODO: why the loss could be negative? The attentions associated with the patches are too small?
+    if norm_atts_weight:
+        return top_samples, top_atts, unnorm_top_atts # TODO: why the loss could be negative? The attentions associated with the patches are too small?
     return top_samples, unnorm_top_atts, unnorm_top_atts
     # Flatten the attention distribution and sampel from it
     

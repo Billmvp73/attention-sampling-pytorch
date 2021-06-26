@@ -49,7 +49,7 @@ def main(opts):
               ats_model = MultiAtsParallelATSModel(attention_models, feature_model, classification_head, n_patches=opts.n_patches, patch_size=opts.patch_size, scales=opts.scales)
             else:
               # Normalize the probability of samples among all scales
-              ats_model = MultiAtsParallelATSModel(attention_models, feature_model, classification_head, n_patches=opts.n_patches, patch_size=opts.patch_size, scales=opts.scales, norm_resample=True)
+              ats_model = MultiAtsParallelATSModel(attention_models, feature_model, classification_head, n_patches=opts.n_patches, patch_size=opts.patch_size, scales=opts.scales, norm_resample=True, norm_atts_weight=True)
           else:
             print("Single attention models for multiple scales.")
             ats_model = MultiParallelATSModel(attention_model, feature_model, classification_head, n_patches=opts.n_patches, patch_size=opts.patch_size, scales=opts.scales)
@@ -169,6 +169,7 @@ if __name__ == '__main__':
     parser.add_argument("--map_parallel", type=bool, default=False)
     parser.add_argument("--parallel_models", type=bool, default=False)
     parser.add_argument("--norm_resample", type=bool, default=False)
+    parser.add_argument("--norm_atts_weight", type=bool, default=False)
     parser.add_argument("--area_norm", type=bool, default=False)
     parser.add_argument("--resume", type=bool, default=False)
     parser.add_argument("--multiResBatch", type=bool, default=False, help="Flag to train multiresolution in separate batches")

@@ -444,7 +444,7 @@ class MultiAtsParallelATSModel(nn.Module):
     """
 
     def __init__(self, attention_models, feature_model, classifier, n_patches, patch_size, scales,receptive_field=0,
-                 replace=False, use_logits=False, norm_resample=False):
+                 replace=False, use_logits=False, norm_resample=False, norm_atts_weight=False):
         super(MultiAtsParallelATSModel, self).__init__()
 
         self.attention_models = attention_models
@@ -461,6 +461,7 @@ class MultiAtsParallelATSModel(nn.Module):
         self.scales = scales
         assert self.scales[0] == 1
         self.norm_resample = norm_resample
+        self.norm_atts_weight = norm_atts_weight
 
     def forward(self, x_lows, x_highs):
         high_ats_shape = None
@@ -478,7 +479,7 @@ class MultiAtsParallelATSModel(nn.Module):
             multi_sampled_attention.append(sampled_attention)
             attention_maps.append(attention_map)
         if self.norm_resample:
-            patches, sampled_attention, unnorm_atts = norm_resample(self.n_patches, multi_patches, multi_sampled_attention, self.scales)
+            patches, sampled_attention, unnorm_atts = norm_resample(self.n_patches, multi_patches, multi_sampled_attention, self.scales, self.norm_atts_weight)
         else:
             patches = torch.cat(multi_patches, 1)
             sampled_attention = torch.cat(multi_sampled_attention, 1)
