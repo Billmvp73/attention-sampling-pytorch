@@ -96,7 +96,7 @@ def trainMultiRes(model, optimizer, train_loader, criterion, entropy_loss_func, 
 
             loss = criterion(y, label) - entropy_loss
             if sampled_scales is not None:
-                freq_sampled_scales = np.bincount(sampled_scales.data.cpu().numpy().reshape(-1))
+                freq_sampled_scales = np.bincount(sampled_scales.data.cpu().numpy().reshape(-1), minlength=len(opts.scales))
                 total_sampled_scales += freq_sampled_scales
         else:
             entropy_loss = entropy_loss_func(attention_maps)
@@ -147,7 +147,7 @@ def evaluateMultiRes(model, test_loader, criterion, entropy_loss_func, opts):
 
             loss = criterion(y, label) - entropy_loss
             if sampled_scales is not None:
-                freq_sampled_scales = np.bincount(sampled_scales.data.cpu().numpy().reshape(-1))
+                freq_sampled_scales = np.bincount(sampled_scales.data.cpu().numpy().reshape(-1), minlength=len(opts.scales))
                 total_sampled_scales += freq_sampled_scales
         else:
             entropy_loss = entropy_loss_func(attention_maps)
