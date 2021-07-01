@@ -92,7 +92,7 @@ def trainMultiRes(model, optimizer, train_loader, criterion, entropy_loss_func, 
         if type(attention_maps) is list:
             if sampled_scales is not None:
                 freq_sampled_scales = np.bincount(sampled_scales.data.cpu().numpy().reshape(-1), minlength=len(opts.scales))
-                entropy_loss = torch.tensor([freq_sampled_scales[i] * entropy_loss_func(attention_map) for i, attention_map in enumerate(attention_maps)]).sum() / sampled_scales.sum()
+                entropy_loss = torch.tensor([freq_sampled_scales[i] * entropy_loss_func(attention_map) for i, attention_map in enumerate(attention_maps)]).sum() / freq_sampled_scales.sum()
             else:
                 entropy_loss = torch.tensor([entropy_loss_func(attention_map) for attention_map in attention_maps]).sum() / len(opts.scales)
             # entropy_loss = torch.tensor([entropy_loss_func(attention_map * scale ** 2) for attention_map, scale in zip(attention_maps, opts.scales)]).sum() / len(opts.scales)
@@ -148,7 +148,7 @@ def evaluateMultiRes(model, test_loader, criterion, entropy_loss_func, opts):
             
             if sampled_scales is not None:
                 freq_sampled_scales = np.bincount(sampled_scales.data.cpu().numpy().reshape(-1), minlength=len(opts.scales))
-                entropy_loss = torch.tensor([freq_sampled_scales[i] * entropy_loss_func(attention_map) for i, attention_map in enumerate(attention_maps)]).sum() / sampled_scales.sum()
+                entropy_loss = torch.tensor([freq_sampled_scales[i] * entropy_loss_func(attention_map) for i, attention_map in enumerate(attention_maps)]).sum() / freq_sampled_scales.sum()
             else:
                 entropy_loss = torch.tensor([entropy_loss_func(attention_map) for attention_map in attention_maps]).sum() / len(opts.scales)
 
