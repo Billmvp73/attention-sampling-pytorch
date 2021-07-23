@@ -31,3 +31,10 @@ For more information on the ExaMode project, please visit www.examode.eu.
 
 
 
+# Research Questions
+1. Why different attention map each inference on the same input image?
+2. The high attention scores on wrong patches could be caused by the various background in this dataset? Go see the speedlimit dataset
+3. Run multiple rounds and take some median/average (after fixing the first bug)
+4. Is the expectation really a good fit for attention estimation?
+   
+

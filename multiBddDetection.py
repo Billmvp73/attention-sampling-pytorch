@@ -116,9 +116,9 @@ def main(opts):
             train_loss, train_metrics = trainMultiResBatches(ats_model, optimizer, train_loader, criterion, entropy_loss_func, opts)
           else:
             train_loss, train_metrics = trainMultiRes(ats_model, optimizer, train_loader, criterion, entropy_loss_func, opts)
-          if epoch % 2 == 0:
-            save_checkpoint(ats_model, optimizer, os.path.join(opts.checkpoint_path, "checkpoint{:02d}.pth".format(epoch)), epoch)
-            print("Save "+os.path.join(opts.checkpoint_path, "checkpoint{:02d}.pth".format(epoch))+" successfully.")
+          # if epoch % 2 == 0:
+          save_checkpoint(ats_model, optimizer, os.path.join(opts.checkpoint_path, "checkpoint{:02d}.pth".format(epoch)), epoch)
+          print("Save "+os.path.join(opts.checkpoint_path, "checkpoint{:02d}.pth".format(epoch))+" successfully.")
           if not opts.multiResBatch:
             print("Epoch {}, train loss: {:.3f}, train metrics: {:.3f}".format(epoch, train_loss, train_metrics["accuracy"]))
           else:

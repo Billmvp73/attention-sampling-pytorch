@@ -26,13 +26,13 @@ class SamplePatches(nn.Module):
     """
 
     def __init__(self, n_patches, patch_size, receptive_field=0, replace=False,
-                 use_logits=False, **kwargs):
+                 use_logits=False, top_k=False, **kwargs):
         self._n_patches = n_patches
         self._patch_size = (patch_size, patch_size)
         self._receptive_field = receptive_field
         self._replace = replace
         self._use_logits = use_logits
-
+        self._top_k = top_k
         super(SamplePatches, self).__init__(**kwargs)
 
     def compute_output_shape(self, input_shape):
@@ -56,7 +56,8 @@ class SamplePatches(nn.Module):
             attention,
             sample_space,
             replace=self._replace,
-            use_logits=self._use_logits
+            use_logits=self._use_logits,
+            top_k = self._top_k
         )
         # print(sampled_attention)
 
@@ -444,7 +445,7 @@ class MultiAtsParallelATSModel(nn.Module):
     """
 
     def __init__(self, attention_models, feature_model, classifier, n_patches, patch_size, scales,receptive_field=0,
-                 replace=False, use_logits=False, norm_resample=False, norm_atts_weight=False):
+                 replace=False, use_logits=False, norm_resample=False, norm_atts_weight=False, top_k=False):
         super(MultiAtsParallelATSModel, self).__init__()
 
         self.attention_models = attention_models
@@ -452,7 +453,7 @@ class MultiAtsParallelATSModel(nn.Module):
         self.classifier = classifier
 
         self.multiSampler = MultiSamplePatches(n_patches, patch_size, scales, receptive_field, replace, use_logits)
-        self.sampler = SamplePatches(n_patches, patch_size, receptive_field, replace, use_logits)
+        self.sampler = SamplePatches(n_patches, patch_size, receptive_field, replace, use_logits, top_k)
         self.expectation = Expectation(replace=replace)
 
         self.patch_size = patch_size

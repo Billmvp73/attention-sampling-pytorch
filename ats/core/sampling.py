@@ -9,6 +9,8 @@ def _sample_with_replacement(logits, n_samples):
     distribution = dist.categorical.Categorical(logits=logits)
     return distribution.sample(sample_shape=torch.Size([n_samples])).transpose(0, 1)
 
+def _sample_top_k(logits, n_samples):
+    return torch.topk(logits, k = n_samples)[1]
 
 def _sample_without_replacement(logits, n_samples):
     """Sample without replacement using the Gumbel-max trick.
@@ -69,7 +71,7 @@ def norm_resample(n_samples, multi_samples, multi_attention, scales, norm_atts_w
     
 
 def sample(n_samples, attention, sample_space, replace=False,
-           use_logits=False):
+           use_logits=False, top_k=False):
     """Sample from the passed in attention distribution.
     Arguments
     ---------
@@ -86,7 +88,8 @@ def sample(n_samples, attention, sample_space, replace=False,
         _sample_with_replacement if replace
         else _sample_without_replacement
     )
-
+    if top_k:
+        sampling_function = (_sample_top_k)
     # Flatten the attention distribution and sample from it
     logits = logits.reshape(-1, sample_space[0]*sample_space[1])
     samples = sampling_function(logits, n_samples)

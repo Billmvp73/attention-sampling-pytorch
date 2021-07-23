@@ -57,7 +57,7 @@ def showPatch(patch, img):
     # visualize(patch)
     # visualize(img)
 
-def patchGrid(patches, maps, imgs, size, label):
+def patchGrid(patches, maps, imgs, size, label, sampled_scales=None):
     row, col = size
     figs, axs = plt.subplots(row+2, col)
     for i in range(patches.shape[0]):
@@ -65,7 +65,10 @@ def patchGrid(patches, maps, imgs, size, label):
         c = i % col
         np_patch = patches[i].cpu().numpy().transpose(1, 2, 0)
         axs[r, c].imshow(np_patch)
-        axs[r, c].set_title("(%d, %d)"%(i, label[i]))
+        if sampled_scales is None:
+            axs[r, c].set_title("(%d)"%(label[i]))
+        else:
+             axs[r, c].set_title("(%d, %d)"%(sampled_scales[i], label[i]))
         axs[r, c].axis("off")
     for i in range(len(maps)):
         map = maps[i]

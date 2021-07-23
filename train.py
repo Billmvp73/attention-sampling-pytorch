@@ -82,6 +82,8 @@ def trainMultiRes(model, optimizer, train_loader, criterion, entropy_loss_func, 
     total_sampled_scales = np.zeros(len(opts.scales), dtype=np.int)
     # Put model in training mode
     model.train()
+    for ats_model in model.attention_models:
+        ats_model.train()
 
     for i, (x_lows, x_highs, label) in enumerate(tqdm(train_loader)):
         x_lows, x_highs, label = move_to([x_lows, x_highs, label], opts.device)
@@ -131,7 +133,9 @@ def evaluateMultiRes(model, test_loader, criterion, entropy_loss_func, opts):
     total_sampled_scales = np.zeros(len(opts.scales), dtype=np.int)
     # Put model in eval mode
     model.eval()
-
+    for ats_model in model.attention_models:
+        ats_model.eval()
+    # model.sampler._top_k = True
     for i, (x_lows, x_highs, label) in enumerate(tqdm(test_loader)):
 
         x_lows, x_highs, label = move_to([x_lows, x_highs, label], opts.device)
@@ -171,8 +175,7 @@ def evaluateMultiRes(model, test_loader, criterion, entropy_loss_func, opts):
             for b in range(patches.shape[0]):
                 print("expectation prediction: ", y_probs[b])
                 print("label prediction: ", label[0])
-                if sampled_scales is not None:
-                    print("sampled patch scales: ", sampled_scales[b])
+                
                 batch_patches = patches[b]
                 patch_feature = patch_features[b]
                 y_patch = model.classifier(patch_feature)
@@ -197,8 +200,12 @@ def evaluateMultiRes(model, test_loader, criterion, entropy_loss_func, opts):
                     batch_maps = [attention_maps[b].cpu().numpy()]
                 batch_imgs = [x_lows[i][b] for i in range(len(model.scales))]
                 # mapGrid(batch_maps, batch_imgs, model.scales)
-                patchGrid(batch_patches, batch_maps, batch_imgs, (3, 5), predicted)
-
+                if sampled_scales is not None:
+                    print("sampled patch scales: ", sampled_scales[b])
+                    patchGrid(batch_patches, batch_maps, batch_imgs, (1, 5), predicted, sampled_scales[b])
+                else:
+                    patchGrid(batch_patches, batch_maps, batch_imgs, (1, 5), predicted)
+    # model.sampler._top_k = False
     test_loss_epoch = np.round(np.mean(losses), 4)
     metrics = calc_cls_measures(y_probs, y_trues)
     print("Sampled scale frequencies: ", total_sampled_scales)
@@ -364,15 +371,19 @@ def evaluateMultiResBatches(model, test_loader, criterion, entropy_loss_func, op
     return test_loss_epoch, metrics
 
 def save_checkpoint(model, optimizer, save_path, epoch):
-    torch.save({
-        'model_state_dict': model.state_dict(),
-        'optimizer_state_dict': optimizer.state_dict(),
-        'epoch': epoch
-    }, save_path)
+    state_dict = {}
+    for i, ats_model in enumerate(model.attention_models):
+        state_dict['ats_model_state_dict%d'%i] = ats_model.state_dict()
+    state_dict['model_state_dict'] = model.state_dict()
+    state_dict['optimizer_state_dict'] = optimizer.state_dict()
+    state_dict['epoch'] = epoch
+    torch.save(state_dict, save_path)
 
 def load_checkpoint(model, optimizer, load_path):
     checkpoint = torch.load(load_path)
     model.load_state_dict(checkpoint['model_state_dict'])
+    for i, ats_model in enumerate(model.attention_models):
+        ats_model.load_state_dict(checkpoint['ats_model_state_dict%d'%i])
     optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
     epoch = checkpoint['epoch']
     

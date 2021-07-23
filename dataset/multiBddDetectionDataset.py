@@ -234,9 +234,9 @@ def reverse_transform(inp):
 
 
 if __name__ == '__main__':
-    bdd_detection_dataset = MultiBddDetection('dataset/bdd_detection', split='train', scales=[1, 0.5, 0.25])
+    bdd_detection_dataset = MultiBddDetection('dataset/bdd_detection', split='val', scales=[1, 0.5, 0.25])
 
-    bdd_detection_dataloader = DataLoader(bdd_detection_dataset, shuffle=True, batch_size=4)
+    bdd_detection_dataloader = DataLoader(bdd_detection_dataset, shuffle=False, batch_size=4)
 
     for i, (x_low, x_high, label) in enumerate(bdd_detection_dataloader):
         print(x_low)

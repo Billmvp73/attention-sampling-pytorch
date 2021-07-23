@@ -260,6 +260,9 @@ class AttentionSaverMultiParallelBddDetection:
 
     def on_train_begin(self):
         opts = self.opts
+        self.ats_model.eval()
+        for ats_model in self.ats_model.attention_models:
+            ats_model.eval()
         with torch.no_grad():
             lows = []
             highs = []
@@ -277,6 +280,9 @@ class AttentionSaverMultiParallelBddDetection:
 
     def __call__(self, epoch, losses=None, metrics=None):
         opts = self.opts
+        self.ats_model.eval()
+        for ats_model in self.ats_model.attention_models:
+            ats_model.eval()
         with torch.no_grad():
             lows = []
             highs = []
