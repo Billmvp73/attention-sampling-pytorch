@@ -4,7 +4,7 @@ import numpy as np
 from tqdm import tqdm
 import pdb
 
-from utils import calc_cls_measures, move_to
+from utils import calc_cls_measures, move_to, clip_grad_norm_
 from ats.utils import visualize, showPatch, patchGrid, mapGrid
 
 def train(model, optimizer, train_loader, criterion, entropy_loss_func, opts):
@@ -92,23 +92,26 @@ def trainMultiRes(model, optimizer, train_loader, criterion, entropy_loss_func, 
         y, attention_maps, patches, x_lows, patch_features, sampled_scales = model(x_lows, x_highs)
        
         if type(attention_maps) is list:
-            # if sampled_scales is not None:
-            #     freq_sampled_scales = np.bincount(sampled_scales.data.cpu().numpy().reshape(-1), minlength=len(opts.scales))
-            #     entropy_loss = torch.tensor([freq_sampled_scales[i] * entropy_loss_func(attention_map) for i, attention_map in enumerate(attention_maps)]).sum() / freq_sampled_scales.sum()
-            # else:
-            entropy_loss = torch.tensor([entropy_loss_func(attention_map) for attention_map in attention_maps]).sum() / len(opts.scales)
+            if sampled_scales is not None:
+                freq_sampled_scales = np.bincount(sampled_scales.data.cpu().numpy().reshape(-1), minlength=len(opts.scales))
+                entropy_loss = torch.tensor([freq_sampled_scales[i] * entropy_loss_func(attention_map) for i, attention_map in enumerate(attention_maps)]).sum() / freq_sampled_scales.sum()
+            else:
+                entropy_loss = torch.tensor([entropy_loss_func(attention_map) for attention_map in attention_maps]).sum() / len(opts.scales)
             # entropy_loss = torch.tensor([entropy_loss_func(attention_map * scale ** 2) for attention_map, scale in zip(attention_maps, opts.scales)]).sum() / len(opts.scales)
 
             loss = criterion(y, label) - entropy_loss
             if sampled_scales is not None:
                 freq_sampled_scales = np.bincount(sampled_scales.data.cpu().numpy().reshape(-1), minlength=len(opts.scales))
+                # if 0 in freq_sampled_scales:
+                #     print("Check the gradient for that non-sample scale")
                 total_sampled_scales += freq_sampled_scales
         else:
             entropy_loss = entropy_loss_func(attention_maps)
             loss = criterion(y, label) - entropy_loss
         
         loss.backward()
-        torch.nn.utils.clip_grad_norm_(model.parameters(), opts.clipnorm)
+        all_params = [ats_model.parameters() for ats_model in model.attention_models] + [model.parameters()]
+        clip_grad_norm_(all_params, opts.clipnorm)
         optimizer.step()
 
         loss_value = loss.item()
@@ -150,11 +153,11 @@ def evaluateMultiRes(model, test_loader, criterion, entropy_loss_func, opts):
 
         if type(attention_maps) is list:
             
-            # if sampled_scales is not None:
-            #     freq_sampled_scales = np.bincount(sampled_scales.data.cpu().numpy().reshape(-1), minlength=len(opts.scales))
-            #     entropy_loss = torch.tensor([freq_sampled_scales[i] * entropy_loss_func(attention_map) for i, attention_map in enumerate(attention_maps)]).sum() / freq_sampled_scales.sum()
-            # else:
-            entropy_loss = torch.tensor([entropy_loss_func(attention_map) for attention_map in attention_maps]).sum() / len(opts.scales)
+            if sampled_scales is not None:
+                freq_sampled_scales = np.bincount(sampled_scales.data.cpu().numpy().reshape(-1), minlength=len(opts.scales))
+                entropy_loss = torch.tensor([freq_sampled_scales[i] * entropy_loss_func(attention_map) for i, attention_map in enumerate(attention_maps)]).sum() / freq_sampled_scales.sum()
+            else:
+                entropy_loss = torch.tensor([entropy_loss_func(attention_map) for attention_map in attention_maps]).sum() / len(opts.scales)
 
             loss = criterion(y, label) - entropy_loss
             if sampled_scales is not None:
