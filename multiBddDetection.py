@@ -18,6 +18,8 @@ from dataset.bdd_detection_dataset import BddDetection
 from dataset.multiBddDetectionDataset import MultiBddDetection
 from train import trainMultiResBatches, evaluateMultiResBatches, train, evaluate, trainMultiRes, evaluateMultiRes, save_checkpoint, load_checkpoint
 
+import warnings
+warnings.filterwarnings("ignore", category=UserWarning)
 def main(opts):
     if not os.path.exists(opts.load_dir):
       os.mkdir(opts.load_dir)
