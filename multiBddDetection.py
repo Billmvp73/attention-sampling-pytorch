@@ -10,7 +10,7 @@ from models.attention_model import AttentionModelBddDetection, AttentionModelMul
 from models.feature_model import FeatureModelBddDetection
 from models.classifier import ClassificationHead
 
-from ats.core.ats_layer import ATSModel, MultiATSModel, MultiParallelATSModel, MultiAtsParallelATSModel
+from ats.core.ats_layer import ATSModel, MultiATSModel, MultiParallelATSModel, MultiAtsParallelATSModel, FixedNParallelATSModel
 from ats.utils.regularizers import MultinomialEntropy
 from ats.utils.logging import AttentionSaverMultiBddDetection, AttentionSaverMultiParallelBddDetection, AttentionSaverMultiBatchBddDetection
 
@@ -48,7 +48,11 @@ def main(opts):
             print("Multiple attention models for multiple scales.")
             attention_models = [AttentionModelBddDetection(squeeze_channels=True, softmax_smoothing=1e-4).to(opts.device) for _ in opts.scales]
             if not opts.norm_resample:
-              ats_model = MultiAtsParallelATSModel(attention_models, feature_model, classification_head, n_patches=opts.n_patches, patch_size=opts.patch_size, scales=opts.scales)
+              if opts.fixed_patches is None:
+                ats_model = MultiAtsParallelATSModel(attention_models, feature_model, classification_head, n_patches=opts.n_patches, patch_size=opts.patch_size, scales=opts.scales)
+              else:
+                opts.fixed_patches = [32, 8, 2]
+                ats_model = FixedNParallelATSModel(attention_models, feature_model, classification_head, opts.fixed_patches, patch_size=opts.patch_size, scales=opts.scales)
             else:
               # Normalize the probability of samples among all scales
               ats_model = MultiAtsParallelATSModel(attention_models, feature_model, classification_head, n_patches=opts.n_patches, patch_size=opts.patch_size, scales=opts.scales, norm_resample=True, norm_atts_weight=opts.norm_atts_weight)
@@ -89,7 +93,10 @@ def main(opts):
                             {'params': ats_model.expectation.parameters()}
                             ], lr=opts.lr)
     else:
-      optimizer = optim.Adam([{'params': ats.part1.parameters(), 'weight_decay': 1e-5} for ats in ats_model.attention_models] + [{'params': ats.part2.parameters()} for ats in ats_model.attention_models] + [{'params': ats_model.feature_model.parameters()}, {'params': ats_model.classifier.parameters()}, {'params': ats_model.sampler.parameters()},{'params': ats_model.expectation.parameters()}], lr=opts.lr)
+      if opts.fixed_patches is None:
+        optimizer = optim.Adam([{'params': ats.part1.parameters(), 'weight_decay': 1e-5} for ats in ats_model.attention_models] + [{'params': ats.part2.parameters()} for ats in ats_model.attention_models] + [{'params': ats_model.feature_model.parameters()}, {'params': ats_model.classifier.parameters()}, {'params': ats_model.sampler.parameters()},{'params': ats_model.expectation.parameters()}], lr=opts.lr)
+      else:
+        optimizer = optim.Adam([{'params': ats.part1.parameters(), 'weight_decay': 1e-5} for ats in ats_model.attention_models] + [{'params': ats.part2.parameters()} for ats in ats_model.attention_models] + [{'params': ats_model.feature_model.parameters()}, {'params': ats_model.classifier.parameters()}, {'params': ats_model.expectation.parameters()}] + [{'params': sampler.parameters()} for sampler in ats_model.sampler_list], lr=opts.lr)
     scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=opts.decrease_lr_at, gamma=0.1)
 
     
@@ -170,7 +177,8 @@ if __name__ == '__main__':
     # parser.add_argument("--checkpoint_path", type=str, help="An output checkpoint directory", default='output/bdd_detection/checkpoint')
     parser.add_argument("--map_parallel", type=bool, default=False)
     parser.add_argument("--parallel_models", type=bool, default=False)
-    parser.add_argument("--norm_resample", type=bool, default=False)
+    parser.add_argument("--norm_resample", type=bool, default=False),
+    parser.add_argument("--fixed_patches", type=bool, default=None),
     parser.add_argument("--norm_atts_weight", type=bool, default=False)
     parser.add_argument("--area_norm", type=bool, default=False)
     parser.add_argument("--resume", type=bool, default=False)
