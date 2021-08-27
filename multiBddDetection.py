@@ -21,10 +21,13 @@ from train import trainMultiResBatches, evaluateMultiResBatches, train, evaluate
 import warnings
 warnings.filterwarnings("ignore", category=UserWarning)
 def main(opts):
-    if not os.path.exists(opts.load_dir):
-      os.mkdir(opts.load_dir)
     if not os.path.exists(opts.output_dir):
       os.mkdir(opts.output_dir)
+    if opts.load_dir.startswith('.'):
+      opts.load_dir = os.path.join(opts.output_dir, opts.load_dir)
+    print(opts.load_dir)
+    if not os.path.exists(opts.load_dir):
+      os.mkdir(opts.load_dir)
     if not opts.multiResBatch:
       train_dataset = MultiBddDetection('dataset/bdd_detection', split="train", scales = opts.scales)
       test_dataset = MultiBddDetection('dataset/bdd_detection', split='val', scales = opts.scales)
