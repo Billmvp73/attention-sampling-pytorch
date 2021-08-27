@@ -23,7 +23,7 @@ warnings.filterwarnings("ignore", category=UserWarning)
 def main(opts):
     if not os.path.exists(opts.output_dir):
       os.mkdir(opts.output_dir)
-    if opts.load_dir.startswith('.'):
+    if '/' in opts.load_dir:
       opts.load_dir = os.path.join(opts.output_dir, opts.load_dir)
     print(opts.load_dir)
     if not os.path.exists(opts.load_dir):
