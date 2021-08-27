@@ -31,6 +31,7 @@ def main(opts):
     else:
       train_dataset = BddDetection('dataset/bdd_detection', split="train")
       test_dataset = BddDetection('dataset/bdd_detection', split="val")
+    print(len(train_dataset), len(test_dataset))
     train_loader = DataLoader(train_dataset, batch_size=opts.batch_size, shuffle=True, num_workers=opts.num_workers)
     test_loader = DataLoader(test_dataset, shuffle=False, batch_size=opts.batch_size, num_workers=opts.num_workers)
 
