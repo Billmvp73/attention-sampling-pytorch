@@ -35,23 +35,22 @@ class STS:
             final_annotations = []
             for anno in annotations:
                 name = anno["name"]
-                img_path = os.path.join(self._directory, name)
-                images.append(img_path)
                 img_labels = anno["labels"]
                 scene_attr = anno["attributes"]
-                if scene_attr["scene"] != "highway":
-                    continue
-                target_anno = []
-                for img_label in img_labels:
-                    if img_label["category"] not in self.CLASSES_TO_IDX:
-                        continue
-                    attributes = img_label["attributes"]
-                    if not attributes["occluded"] and not attributes["truncated"]:
-                        box2d = img_label["box2d"]
-                        target_anno.append([float(box2d["x1"]), float(box2d["y1"]), float(box2d["x2"]), float(box2d["y2"]), self.CLASSES_TO_IDX[img_label["category"]]])
-                if len(target_anno) == 0:
-                    target_anno.append([-1, -1, -1, -1, 0])
-                final_annotations.append(target_anno)
+                if scene_attr["scene"] == "highway" and scene_attr["timeofday"] == "daytime":
+                    target_anno = []
+                    img_path = os.path.join(self._directory, name)
+                    images.append(img_path)
+                    for img_label in img_labels:
+                        if img_label["category"] not in self.CLASSES_TO_IDX:
+                            continue
+                        attributes = img_label["attributes"]
+                        if not attributes["occluded"] and not attributes["truncated"]:
+                            box2d = img_label["box2d"]
+                            target_anno.append([float(box2d["x1"]), float(box2d["y1"]), float(box2d["x2"]), float(box2d["y2"]), self.CLASSES_TO_IDX[img_label["category"]]])
+                    if len(target_anno) == 0:
+                        target_anno.append([-1, -1, -1, -1, 0])
+                    final_annotations.append(target_anno)
             return list(zip(images, final_annotations))
 
     def __len__(self):

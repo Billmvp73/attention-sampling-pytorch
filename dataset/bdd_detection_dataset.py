@@ -13,6 +13,9 @@ from torch.utils.data import Dataset, DataLoader
 from torchvision import transforms
 import numpy as np
 import json
+import matplotlib
+matplotlib.use('TkAgg')
+from matplotlib import pyplot as plt
 
 class STS:
     """The STS class reads the annotations and creates the corresponding
@@ -35,23 +38,24 @@ class STS:
             final_annotations = []
             for anno in annotations:
                 name = anno["name"]
-                img_path = os.path.join(self._directory, name)
-                images.append(img_path)
+                # if name == "07184fbb-bab6f8ce.jpg":
+                #     print("weired thing.")
                 img_labels = anno["labels"]
                 scene_attr = anno["attributes"]
-                if scene_attr["scene"] != "highway":
-                    continue
-                target_anno = []
-                for img_label in img_labels:
-                    if img_label["category"] not in self.CLASSES_TO_IDX:
-                        continue
-                    attributes = img_label["attributes"]
-                    if not attributes["occluded"] and not attributes["truncated"]:
-                        box2d = img_label["box2d"]
-                        target_anno.append([float(box2d["x1"]), float(box2d["y1"]), float(box2d["x2"]), float(box2d["y2"]), self.CLASSES_TO_IDX[img_label["category"]]])
-                if len(target_anno) == 0:
-                    target_anno.append([-1, -1, -1, -1, 0])
-                final_annotations.append(target_anno)
+                if scene_attr["scene"] == "highway" and  scene_attr["timeofday"] == "daytime":
+                    target_anno = []
+                    img_path = os.path.join(self._directory, name)
+                    images.append(img_path)
+                    for img_label in img_labels:
+                        if img_label["category"] not in self.CLASSES_TO_IDX:
+                            continue
+                        attributes = img_label["attributes"]
+                        if not attributes["occluded"] and not attributes["truncated"]:
+                            box2d = img_label["box2d"]
+                            target_anno.append([float(box2d["x1"]), float(box2d["y1"]), float(box2d["x2"]), float(box2d["y2"]), self.CLASSES_TO_IDX[img_label["category"]]])
+                    if len(target_anno) == 0:
+                        target_anno.append([-1, -1, -1, -1, 0])
+                    final_annotations.append(target_anno)
             return list(zip(images, final_annotations))
 
     def __len__(self):
@@ -159,7 +163,7 @@ class BddDetection(Dataset):
 
     def __getitem__(self, i):
         image, category = self._data[i]
-
+        print(image)
         x_high = Image.open(image)
         x_high = self.image_transform(x_high)
 
@@ -208,6 +212,9 @@ def make_weights_for_balanced_classes(images, num_classes):
         weight[idx] = weight_per_class[val[1]]
     return weight
 
+    
+    # plt.show()
+    
 
 def reverse_transform(inp):
     """ Do a reverse transformation. inp should be of shape [3, H, W] """
@@ -225,6 +232,11 @@ if __name__ == '__main__':
     bdd_detection_dataset = BddDetection('dataset/bdd_detection')
 
     bdd_detection_dataloader = DataLoader(bdd_detection_dataset, shuffle=True, batch_size=4)
-
+    print(len(bdd_detection_dataloader))
     for i, (x_low, x_high, label) in enumerate(bdd_detection_dataloader):
-        print(x_low)
+        fig, axs = plt.subplots(2, 2)
+        axs[0, 0].imshow(x_low[0].data.cpu().numpy().transpose(1, 2, 0))
+        axs[0, 1].imshow(x_low[1].data.cpu().numpy().transpose(1, 2, 0))
+        axs[1, 0].imshow(x_low[2].data.cpu().numpy().transpose(1, 2, 0))
+        axs[1, 1].imshow(x_low[3].data.cpu().numpy().transpose(1, 2, 0))
+        plt.show()
