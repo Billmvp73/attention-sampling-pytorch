@@ -14,7 +14,7 @@ from torchvision import transforms
 import numpy as np
 import json
 import matplotlib
-matplotlib.use('TkAgg')
+# matplotlib.use('TkAgg')
 from matplotlib import pyplot as plt
 
 class STS:
