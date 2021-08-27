@@ -38,6 +38,9 @@ class STS:
                 img_path = os.path.join(self._directory, name)
                 images.append(img_path)
                 img_labels = anno["labels"]
+                scene_attr = anno["attributes"]
+                if scene_attr["scene"] != "highway":
+                    continue
                 target_anno = []
                 for img_label in img_labels:
                     if img_label["category"] not in self.CLASSES_TO_IDX:
