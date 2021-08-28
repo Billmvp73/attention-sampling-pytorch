@@ -37,7 +37,7 @@ class STS:
                 name = anno["name"]
                 img_labels = anno["labels"]
                 scene_attr = anno["attributes"]
-                if scene_attr["scene"] == "highway" and scene_attr["timeofday"] == "daytime":
+                if scene_attr["timeofday"] == "daytime":
                     target_anno = []
                     img_path = os.path.join(self._directory, name)
                     images.append(img_path)
